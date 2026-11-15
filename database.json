@@ -1,0 +1,50 @@
+[
+  {
+    "id": "dreame-l10s-ultra",
+    "marca": "Dreame",
+    "modello": "L10s Ultra",
+    "categoria": "Robot Aspirapolvere",
+    "codice_oem_batteria": "P2150-8S2P-XWDLS",
+    "specifiche_batteria": "14.4V - 5200mAh Li-Ion (Connettore 4 pin)",
+    "dimensioni_mm": "133 x 38 x 38 mm",
+    "fascia_prezzo_ricambio": "38€ - 55€",
+    "consumabili_inclusi": "Spazzola centrale in gomma, 2 panni Mop rotanti, Filtro HEPA E11, Sacchetto polvere 3L",
+    "query_amazon": "batteria+kit+ricambi+Dreame+L10s+Ultra",
+    "query_ebay": "batteria+ricambi+Dreame+L10s+Ultra",
+    "ai_enriched": false,
+    "nota_tecnica_ai": "",
+    "faq_ai": []
+  },
+  {
+    "id": "roborock-s7-maxv-ultra",
+    "marca": "Roborock",
+    "modello": "S7 MaxV Ultra",
+    "categoria": "Robot Aspirapolvere",
+    "codice_oem_batteria": "BRR-2P4S-5200S",
+    "specifiche_batteria": "14.4V - 5200mAh / 6400mAh Li-Ion (74.88Wh)",
+    "dimensioni_mm": "137 x 44 x 45 mm",
+    "fascia_prezzo_ricambio": "35€ - 52€",
+    "consumabili_inclusi": "Spazzola principale flottante in gomma, Filtro HEPA lavabile, Panno VibraRise, Spazzola laterale 5 bracci",
+    "query_amazon": "batteria+ricambi+Roborock+S7+MaxV+Ultra",
+    "query_ebay": "batteria+BRR-2P4S-5200S+Roborock+S7",
+    "ai_enriched": false,
+    "nota_tecnica_ai": "",
+    "faq_ai": []
+  },
+  {
+    "id": "worx-landroid-m500-wr141e",
+    "marca": "Worx Landroid",
+    "modello": "M500 (WR141E)",
+    "categoria": "Robot Tagliaerba",
+    "codice_oem_batteria": "WA3551.3 / WA3553",
+    "specifiche_batteria": "20V Max - 2.0Ah / 4.0Ah PowerShare Li-Ion",
+    "dimensioni_mm": "115 x 76 x 48 mm",
+    "fascia_prezzo_ricambio": "42€ - 68€",
+    "consumabili_inclusi": "Set 30 lame in acciaio inox/titanio 0.9mm con viti anodizzate, Cavo perimetrale 3.4mm",
+    "query_amazon": "batteria+WA3551+lame+ricambio+Worx+Landroid+WR141E",
+    "query_ebay": "batteria+20V+lame+Worx+Landroid+WR141E",
+    "ai_enriched": false,
+    "nota_tecnica_ai": "",
+    "faq_ai": []
+  }
+]
