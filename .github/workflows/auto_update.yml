@@ -1,0 +1,39 @@
+name: Aggiornamento Notturno Portale pSEO
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Si avvia da solo ogni notte alle 03:00 UTC
+  workflow_dispatch:     # Ti permette di avviarlo anche con un clic manuale
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build_and_update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica i file del repository
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installa dipendenze
+        run: pip install -r requirements.txt
+
+      - name: Esegui il generatore del portale con AI
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python build_site.py
+
+      - name: Salva le pagine generate e aggiorna il sito
+        run: |
+          git config --global user.name "pSEO AutoBot"
+          git config --global user.email "bot@noreply.github.com"
+          git add database.json public/
+          git diff --staged --quiet || (git commit -m "Auto-update schede e sitemap [skip ci]" && git push)
