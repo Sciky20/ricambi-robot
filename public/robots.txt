@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ricambirobot.pages.dev/sitemap.xml
