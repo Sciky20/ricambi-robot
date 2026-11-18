@@ -233,6 +233,7 @@ def generate_index_page(db, today_str):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="pBkbOhlZXa5p-vR2Xff77ujhx4NbinX1HerB6K08qRw" />
     <title>{NOME_PORTALE} - Database Compatibilità Batterie e Ricambi Robot</title>
     <meta name="description" content="Trova subito il codice batteria OEM, le misure esatte e i kit ricambi compatibili per il tuo robot aspirapolvere o tagliaerba.">
     <script src="https://cdn.tailwindcss.com"></script>
