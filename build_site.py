@@ -8,7 +8,7 @@ import requests
 # CONFIGURAZIONE CEO (Modifica solo qui)
 # ==========================================
 NOME_PORTALE = "RicambiRobot Check Italia"
-DOMINIO_SITO = "https://ricambirobot-pages.dev"  # Cambialo quando colleghi il tuo dominio
+DOMINIO_SITO = "https://ricambi-robot.pages.dev"  # Cambialo quando colleghi il tuo dominio
 AMAZON_TAG = "ricambirobot-21"                         # Il tuo ID Tracciamento Amazon Associates
 EBAY_CAMPID = "5339253914"                       # Il tuo Campaign ID di eBay Partner Network
 MAX_AI_CALLS_PER_RUN = 15                        # Quante nuove schede arricchire con AI a ogni avvio
