@@ -9,7 +9,7 @@ import requests
 # ==========================================
 NOME_PORTALE = "RicambiRobot Check Italia"
 DOMINIO_SITO = "https://ricambi-robot.pages.dev"  # Cambialo quando colleghi il tuo dominio
-AMAZON_TAG = "ricambirobot-21"                         # Il tuo ID Tracciamento Amazon Associates
+AMAZON_TAG = "ricambirobot-21"                   # Il tuo ID Tracciamento Amazon Associates
 EBAY_CAMPID = "5339253914"                       # Il tuo Campaign ID di eBay Partner Network
 MAX_AI_CALLS_PER_RUN = 15                        # Quante nuove schede arricchire con AI a ogni avvio
 OUTPUT_DIR = "public"
@@ -28,7 +28,7 @@ def call_gemini_ai(item):
     Sei un tecnico specializzato in ricambi elettronici. Scrivi in italiano per il modello {item['marca']} {item['modello']} ({item['categoria']}).
     Dati tecnici noti: Codice batteria OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
     
-    Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
+    Restituisci ESCLUSAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
     {{
       "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la polarita del connettore, quando sostituire la batteria e come evitare errori di montaggio.",
       "faq": [
@@ -79,19 +79,25 @@ def get_fallback_content(item):
 
 
 def build_affiliate_links(item):
-    q_amz = urllib.parse.quote_plus(item["query_amazon"].replace("+", " "))
-    q_eby = urllib.parse.quote_plus(item["query_ebay"].replace("+", " "))
-    
-    amz_url = f"https://www.amazon.it/s?k={q_amz}&tag={AMAZON_TAG}"
-    eby_url = (
-        f"https://www.ebay.it/sch/i.html?_nkw={q_eby}"
-        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}&toolid=10001&mkevt=1"
+    q_batt = urllib.parse.quote_plus(f"batteria {item['marca']} {item['modello']}")
+    q_amz_kit = urllib.parse.quote_plus(item["query_amazon"].replace("+", " "))
+    q_eby_kit = urllib.parse.quote_plus(item["query_ebay"].replace("+", " "))
+
+    amz_batt_url = f"https://www.amazon.it/s?k={q_batt}&tag={AMAZON_TAG}"
+    eby_batt_url = (
+        f"https://www.ebay.it/sch/i.html?_nkw={q_batt}"
+        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-batt&toolid=10001&mkevt=1"
     )
-    return amz_url, eby_url
+    amz_kit_url = f"https://www.amazon.it/s?k={q_amz_kit}&tag={AMAZON_TAG}"
+    eby_kit_url = (
+        f"https://www.ebay.it/sch/i.html?_nkw={q_eby_kit}"
+        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-kit&toolid=10001&mkevt=1"
+    )
+    return amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url
 
 
 def generate_model_page(item, today_str):
-    amz_url, eby_url = build_affiliate_links(item)
+    amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
     title = f"Batteria e Ricambi Compatibili {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Tabella {today_str}"
     desc = f"Tabella di compatibilità verificata per {item['marca']} {item['modello']}: codice batteria {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e migliori offerte."
 
@@ -180,13 +186,29 @@ def generate_model_page(item, today_str):
                 </table>
             </div>
 
-            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a href="{amz_url}" target="_blank" rel="nofollow sponsored" class="flex items-center justify-center bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 px-6 rounded-lg shadow transition text-center">
-                    Verifica Prezzo e Disponibilità su Amazon.it &rarr;
-                </a>
-                <a href="{eby_url}" target="_blank" rel="nofollow sponsored" class="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg shadow transition text-center">
-                    Confronta Ricambi e Offerte su eBay.it &rarr;
-                </a>
+            <div class="space-y-4 mt-8">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">1. Batteria di Ricambio Compatibile</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
+                            Cerca Batteria su Amazon.it &rarr;
+                        </a>
+                        <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
+                            Cerca Batteria su eBay.it &rarr;
+                        </a>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
+                            Kit Ricambi su Amazon.it &rarr;
+                        </a>
+                        <a href="{eby_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
+                            Kit Ricambi su eBay.it &rarr;
+                        </a>
+                    </div>
+                </div>
             </div>
             <p class="text-xs text-slate-400 mt-3 text-center">
                 *Controlla sempre che il codice {item['codice_oem_batteria']} o la sigla {item['modello']} siano riportati nella descrizione del venditore prima di confermare l'ordine.
