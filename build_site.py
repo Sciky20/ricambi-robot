@@ -1,12 +1,13 @@
 import html
 import json
 import os
+import re
 import urllib.parse
 from datetime import datetime
 import requests
 
 # ==========================================
-# CONFIGURAZIONE CEO (Modifica solo qui)
+# CONFIGURAZIONE PORTALE
 # ==========================================
 NOME_PORTALE = "RicambiRobot Check"
 DOMINIO_SITO = "https://ricambi-robot.pages.dev"
@@ -20,6 +21,10 @@ DB_FILE = "database.json"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 
+def slugify(text):
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
 def call_gemini_ai(item):
     """Chiama Gemini Flash gratis per generare note di compatibilita e FAQ tecniche uniche."""
     if not GEMINI_API_KEY:
@@ -30,7 +35,7 @@ def call_gemini_ai(item):
     Sei un tecnico specializzato in ricambi elettronici. Scrivi in italiano per il modello {item['marca']} {item['modello']} ({item['categoria']}).
     Dati tecnici noti: Codice batteria OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
     
-    Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
+    Restituisci ESCLUSAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
     {{
       "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la polarita del connettore, quando sostituire la batteria e come evitare errori di montaggio.",
       "faq": [
@@ -80,20 +85,21 @@ def get_fallback_content(item):
     return {"nota_tecnica": nota, "faq": faq}
 
 
-def build_affiliate_links(item):
+def build_affiliate_links(item, suffix=""):
     q_batt = urllib.parse.quote_plus(f"batteria {item['marca']} {item['modello']}")
     q_amz_kit = urllib.parse.quote_plus(item["query_amazon"].replace("+", " "))
     q_eby_kit = urllib.parse.quote_plus(item["query_ebay"].replace("+", " "))
 
+    tag_suffix = f"-{suffix}" if suffix else ""
     amz_batt_url = f"https://www.amazon.it/s?k={q_batt}&tag={AMAZON_TAG}"
     eby_batt_url = (
         f"https://www.ebay.it/sch/i.html?_nkw={q_batt}"
-        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-batt&toolid=10001&mkevt=1"
+        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-batt{tag_suffix}&toolid=10001&mkevt=1"
     )
     amz_kit_url = f"https://www.amazon.it/s?k={q_amz_kit}&tag={AMAZON_TAG}"
     eby_kit_url = (
         f"https://www.ebay.it/sch/i.html?_nkw={q_eby_kit}"
-        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-kit&toolid=10001&mkevt=1"
+        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-kit{tag_suffix}&toolid=10001&mkevt=1"
     )
     return amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url
 
@@ -140,7 +146,7 @@ def get_navbar(today_str):
             <div class="flex items-center gap-3">
                 <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Listino verificado: {today_str}
+                    Listino verificato: {today_str}
                 </span>
                 <a href="/index.html" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
                     Catalogo
@@ -150,9 +156,16 @@ def get_navbar(today_str):
     </header>"""
 
 
-def get_footer():
+def get_footer(brands_list):
+    brand_links = " &middot; ".join(
+        [f'<a href="/marca/{b["slug"]}.html" class="hover:text-emerald-400 transition">{b["name"]}</a>' for b in brands_list[:10]]
+    )
     return f"""<footer class="bg-slate-950 text-slate-400 border-t border-slate-800 mt-16">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+            <div class="mb-8 pb-6 border-b border-slate-800/80">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Archivio Ricambi per Marca</p>
+                <div class="text-xs text-slate-400 leading-relaxed">{brand_links}</div>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-800/80 text-xs leading-relaxed">
                 <div>
                     <p class="text-white font-bold text-sm mb-2">{NOME_PORTALE} Italia</p>
@@ -175,8 +188,53 @@ def get_footer():
     </footer>"""
 
 
-def generate_model_page(item, db, today_str):
+def get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url):
+    return f"""<div class="space-y-4 mb-7">
+        <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
+                    <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile ({item['codice_oem_batteria']})</h2>
+                </div>
+                <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Verifica su Amazon.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+                <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Confronta su eBay.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+            </div>
+        </div>
+
+        <div id="box-kit" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Manutenzione Periodica</span>
+                    <h2 class="text-base font-extrabold text-slate-900 mt-1">Kit Consumabili ({item['consumabili_inclusi'].split(',')[0]})</h2>
+                </div>
+                <span class="text-xs font-medium text-slate-500">Spedizione rapida</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Kit Ricambi su Amazon.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+                <a href="{eby_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Kit Ricambi su eBay.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>"""
+
+
+def generate_model_page(item, db, brands_list, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
+    brand_slug = slugify(item["marca"])
     title = f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Scheda {today_str}"
     desc = f"Compatibilità verificata {item['marca']} {item['modello']}: codice batteria OEM {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e confronto prezzi."
     oem_safe = item["codice_oem_batteria"].replace("'", "")
@@ -228,7 +286,9 @@ def generate_model_page(item, db, today_str):
         f'<script type="application/ld+json">{schema_json}</script>'
     )
 
-    page_html = f"""<!DOCTYPE html>
+    buttons_html = get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url)
+
+    return f"""<!DOCTYPE html>
 <html lang="it">
 <head>
     {head_html}
@@ -237,16 +297,14 @@ def generate_model_page(item, db, today_str):
     {get_navbar(today_str)}
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <!-- Breadcrumb -->
         <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
             <a href="/index.html" class="hover:text-slate-900 transition">Catalogo</a>
             <span>/</span>
-            <span>{item['categoria']}</span>
+            <a href="/marca/{brand_slug}.html" class="hover:text-emerald-700 transition">{item['marca']}</a>
             <span>/</span>
-            <span class="text-slate-900 font-semibold">{item['marca']} {item['modello']}</span>
+            <span class="text-slate-900 font-semibold">{item['modello']}</span>
         </nav>
 
-        <!-- Card Principale -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden mb-8">
             <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 px-6 py-7 text-white border-b border-slate-800">
                 <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -265,7 +323,6 @@ def generate_model_page(item, db, today_str):
             </div>
 
             <div class="p-6 sm:p-8">
-                <!-- 4 KPI Tecnici a colpo d'occhio -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-7">
                     <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Codice OEM</p>
@@ -285,7 +342,6 @@ def generate_model_page(item, db, today_str):
                     </div>
                 </div>
 
-                <!-- Selettore interattivo del problema -->
                 <div class="bg-slate-900 text-white rounded-xl p-5 mb-7 shadow-inner">
                     <div class="flex items-center justify-between mb-3">
                         <p class="text-xs font-bold uppercase tracking-wider text-emerald-400">Selettore Rapido Ricambio</p>
@@ -308,50 +364,19 @@ def generate_model_page(item, db, today_str):
                     <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-3 border-t border-slate-800"></p>
                 </div>
 
-                <!-- Area Bottoni Acquisto -->
-                <div class="space-y-4 mb-7">
-                    <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <div>
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
-                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile ({item['codice_oem_batteria']})</h2>
-                            </div>
-                            <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Verifica su Amazon.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                            <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Confronta su eBay.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                        </div>
-                    </div>
+                {buttons_html}
 
-                    <div id="box-kit" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <div>
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Manutenzione Periodica</span>
-                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Kit Consumabili ({item['consumabili_inclusi'].split(',')[0]})</h2>
-                            </div>
-                            <span class="text-xs font-medium text-slate-500">Spedizione rapida</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Kit Ricambi su Amazon.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                            <a href="{eby_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Kit Ricambi su eBay.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                        </div>
+                <!-- Collegamento alla guida guasti e montaggio -->
+                <div class="mb-7 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-extrabold text-amber-950">LED lampeggiante o errore batteria su {item['modello']}?</p>
+                        <p class="text-xs text-amber-800 mt-0.5">Leggi la procedura passo-passo di sostituzione e reset del sistema BMS.</p>
                     </div>
+                    <a href="/guida/sostituzione-batteria-{item['id']}.html" class="shrink-0 text-xs font-bold bg-amber-950 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg transition text-center">
+                        Apri Guida Montaggio &rarr;
+                    </a>
                 </div>
 
-                <!-- Tabella Dettagliata -->
                 <div class="border border-slate-200 rounded-xl overflow-hidden">
                     <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Specifiche Tecniche Complete</h3>
@@ -384,18 +409,11 @@ def generate_model_page(item, db, today_str):
             </div>
         </div>
 
-        <!-- Note Tecniche -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
-            <div class="flex items-center gap-2.5 mb-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
-                </div>
-                <h2 class="text-lg font-extrabold text-slate-900">Note Tecniche di Installazione e Sicurezza</h2>
-            </div>
+            <h2 class="text-lg font-extrabold text-slate-900 mb-3">Note Tecniche di Installazione e Sicurezza</h2>
             <p class="text-slate-600 text-sm sm:text-base leading-relaxed">{item['nota_tecnica_ai']}</p>
         </div>
 
-        <!-- FAQ -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
             <h2 class="text-lg font-extrabold text-slate-900 mb-4">Domande Frequenti su {item['marca']} {item['modello']}</h2>
             <div class="space-y-3">
@@ -403,7 +421,6 @@ def generate_model_page(item, db, today_str):
             </div>
         </div>
 
-        <!-- Correlati -->
         <div>
             <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-500 mb-3">Altre Schede Verificate ({item['marca']})</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
@@ -412,7 +429,7 @@ def generate_model_page(item, db, today_str):
         </div>
     </main>
 
-    {get_footer()}
+    {get_footer(brands_list)}
 
     <script>
     function evidenziaRicambio(tipo) {{
@@ -443,10 +460,195 @@ def generate_model_page(item, db, today_str):
     </script>
 </body>
 </html>"""
-    return page_html
 
 
-def generate_index_page(db, today_str):
+def generate_guide_page(item, brands_list, today_str):
+    """Seconda pagina SEO automatica per ogni modello: guida guasti, LED lampeggiante e sostituzione."""
+    amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item, suffix="guida")
+    brand_slug = slugify(item["marca"])
+    title = f"Sostituzione Batteria e Reset Errore {item['marca']} {item['modello']} - Guida {today_str}"
+    desc = f"Come sostituire la batteria ({item['codice_oem_batteria']}) e risolvere i problemi di ricarica o LED lampeggiante su {item['marca']} {item['modello']}."
+
+    steps = [
+        {
+            "name": "Verifica codice OEM e tensione",
+            "text": f"Controlla sull'etichetta del pacco batteria originale il codice {item['codice_oem_batteria']} e la tensione {item['specifiche_batteria']}. Non utilizzare mai batterie con voltaggio differente."
+        },
+        {
+            "name": "Scollegamento in sicurezza e apertura vano",
+            "text": f"Spegni completamente {item['marca']} {item['modello']}, scollegalo dalla base di ricarica e rimuovi le viti del vano inferiore (ingombro previsto: {item['dimensioni_mm']})."
+        },
+        {
+            "name": "Installazione nuova batteria e pulizia contatti",
+            "text": f"Inserisci il nuovo pacco batteria verificando l'incastro del connettore. Approfitta dell'apertura per pulire i contatti metallici e sostituire i filtri usurati ({item['consumabili_inclusi']})."
+        },
+        {
+            "name": "Calibrazione e ciclo di carica iniziale",
+            "text": "Riposiziona il dispositivo sulla base e lascialo in carica continua per almeno 6 ore senza interruzioni per calibrare il circuito elettronico BMS."
+        }
+    ]
+
+    howto_schema = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "HowTo",
+        "name": f"Come sostituire la batteria su {item['marca']} {item['modello']}",
+        "description": desc,
+        "step": [{"@type": "HowToStep", "name": s["name"], "text": s["text"]} for s in steps]
+    }, ensure_ascii=False)
+
+    head_html = get_head_assets(
+        title,
+        desc,
+        f"{DOMINIO_SITO}/guida/sostituzione-batteria-{item['id']}.html",
+        f'<script type="application/ld+json">{howto_schema}</script>'
+    )
+
+    steps_html = ""
+    for idx, st in enumerate(steps, 1):
+        steps_html += f"""
+        <div class="flex gap-4 p-5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <div class="w-8 h-8 shrink-0 rounded-full bg-slate-900 text-emerald-400 font-mono font-bold text-sm flex items-center justify-center">
+                {idx}
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-900 text-base">{st['name']}</h3>
+                <p class="text-slate-600 text-sm mt-1.5 leading-relaxed">{st['text']}</p>
+            </div>
+        </div>
+        """
+
+    buttons_html = get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url)
+
+    return f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+    {head_html}
+</head>
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased">
+    {get_navbar(today_str)}
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
+            <a href="/index.html" class="hover:text-slate-900">Catalogo</a>
+            <span>/</span>
+            <a href="/marca/{brand_slug}.html" class="hover:text-emerald-700">{item['marca']}</a>
+            <span>/</span>
+            <a href="/modello/{item['id']}.html" class="hover:text-emerald-700">{item['modello']}</a>
+            <span>/</span>
+            <span class="text-slate-900 font-semibold">Guida Sostituzione</span>
+        </nav>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden mb-8">
+            <div class="bg-slate-900 px-6 py-7 text-white border-b border-slate-800">
+                <span class="inline-block bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold px-3 py-1 rounded-full mb-3">
+                    PROCEDURA TECNICA E RESET ERRORE
+                </span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                    Sostituzione Batteria e Risoluzione Errori {item['marca']} {item['modello']}
+                </h1>
+                <p class="text-slate-300 text-sm mt-2 leading-relaxed">
+                    Guida pratica per diagnosticare il calo di autonomia, verificare il codice OEM <span class="font-mono text-emerald-400 font-bold">{item['codice_oem_batteria']}</span> ed eseguire il cambio senza errori.
+                </p>
+            </div>
+
+            <div class="p-6 sm:p-8">
+                <div class="mb-7 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-bold uppercase text-slate-400">Scheda Tecnica di Riferimento</p>
+                        <p class="text-sm font-extrabold text-slate-900 mt-0.5">{item['marca']} {item['modello']} &mdash; {item['specifiche_batteria']}</p>
+                    </div>
+                    <a href="/modello/{item['id']}.html" class="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-lg transition text-center">
+                        &larr; Vai alla Tabella Completa
+                    </a>
+                </div>
+
+                <h2 class="text-lg font-extrabold text-slate-900 mb-4">Procedura Passo-Passo di Sostituzione</h2>
+                <div class="space-y-3.5 mb-8">
+                    {steps_html}
+                </div>
+
+                <h2 class="text-lg font-extrabold text-slate-900 mb-3">Ricambi Verificati Pronti per il Montaggio</h2>
+                {buttons_html}
+
+                <div class="bg-slate-50 rounded-xl p-5 border border-slate-200/80">
+                    <h3 class="text-sm font-extrabold text-slate-900 mb-2">Avvertenze del Tecnico su {item['modello']}</h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">{item['nota_tecnica_ai']}</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    {get_footer(brands_list)}
+</body>
+</html>"""
+
+
+def generate_brand_page(brand_info, brand_items, brands_list, today_str):
+    """Pagina Hub SEO per singola marca (es. /marca/dyson.html)."""
+    brand_name = brand_info["name"]
+    brand_slug = brand_info["slug"]
+    title = f"Batterie e Ricambi Compatibili {brand_name} - Catalogo OEM {today_str}"
+    desc = f"Elenco completo dei modelli {brand_name} verificati: codici batteria OEM, dimensioni vano e kit filtri/spazzole compatibili."
+
+    cards_html = ""
+    for item in brand_items:
+        cards_html += f"""
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+            <div>
+                <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">{item['categoria']}</span>
+                <h2 class="text-lg font-extrabold text-slate-900 mt-2.5">{item['marca']} {item['modello']}</h2>
+                <p class="text-xs font-mono text-slate-600 mt-1.5">Cod. OEM: <strong>{item['codice_oem_batteria']}</strong></p>
+                <p class="text-xs text-slate-500 mt-1">{item['specifiche_batteria']}</p>
+            </div>
+            <div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                <a href="/modello/{item['id']}.html" class="text-xs font-bold text-white bg-slate-900 hover:bg-emerald-600 px-3.5 py-2 rounded-lg transition">
+                    Scheda Ricambi &rarr;
+                </a>
+                <a href="/guida/sostituzione-batteria-{item['id']}.html" class="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                    Guida cambio
+                </a>
+            </div>
+        </div>
+        """
+
+    head_html = get_head_assets(
+        title,
+        desc,
+        f"{DOMINIO_SITO}/marca/{brand_slug}.html"
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+    {head_html}
+</head>
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased">
+    {get_navbar(today_str)}
+
+    <section class="bg-slate-950 text-white border-b border-slate-800 py-10 px-4 sm:px-6">
+        <div class="max-w-5xl mx-auto">
+            <nav class="text-xs text-slate-400 mb-3">
+                <a href="/index.html" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{brand_name}</span>
+            </nav>
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-white">Batterie e Ricambi Compatibili {brand_name}</h1>
+            <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl">
+                Seleziona il tuo modello {brand_name} tra i {len(brand_items)} dispositivi verificati per visualizzare codice OEM della batteria e kit consumabili.
+            </p>
+        </div>
+    </section>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cards_html}
+        </div>
+    </main>
+
+    {get_footer(brands_list)}
+</body>
+</html>"""
+
+
+def generate_index_page(db, brands_list, today_str):
     cards_html = ""
     for item in db:
         cat_lower = item["categoria"].lower()
@@ -489,6 +691,10 @@ def generate_index_page(db, today_str):
         extra_head
     )
 
+    brand_pills = "".join(
+        [f'<a href="/marca/{b["slug"]}.html" class="bg-slate-900 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-800 px-3 py-1 rounded-full transition">{b["name"]} ({b["count"]})</a>' for b in brands_list[:8]]
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -497,7 +703,6 @@ def generate_index_page(db, today_str):
 <body class="bg-slate-100/80 text-slate-800 font-sans antialiased selection:bg-emerald-200 selection:text-slate-900">
     {get_navbar(today_str)}
 
-    <!-- Hero Tecnico -->
     <section class="bg-slate-950 text-white border-b border-slate-800">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16 text-center">
             <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-bold px-3.5 py-1.5 rounded-full mb-5">
@@ -511,7 +716,6 @@ def generate_index_page(db, today_str):
                 Controlla voltaggio, misure del vano e sigla OEM della batteria per robot aspirapolvere, tagliaerba e scope senza fili.
             </p>
 
-            <!-- Barra di Ricerca -->
             <div class="max-w-2xl mx-auto mt-8 relative">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
@@ -519,21 +723,14 @@ def generate_index_page(db, today_str):
                 <input type="text" id="searchInput" onkeyup="filterModels()" placeholder="Cerca marca, modello o codice OEM (es. Dyson V11, Dreame L10s, ABL-D1, WR141E)..." class="w-full pl-12 pr-5 py-4 rounded-2xl bg-white text-slate-900 font-medium text-sm sm:text-base shadow-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50">
             </div>
 
-            <!-- Filtri Rapidi Marca -->
             <div class="flex flex-wrap justify-center gap-2 mt-5 text-xs">
-                <span class="text-slate-500 py-1 font-medium">Ricerche frequenti:</span>
-                <button type="button" onclick="quickBrand('dyson')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Dyson</button>
-                <button type="button" onclick="quickBrand('dreame')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Dreame</button>
-                <button type="button" onclick="quickBrand('roborock')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Roborock</button>
-                <button type="button" onclick="quickBrand('roomba')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Roomba</button>
-                <button type="button" onclick="quickBrand('worx')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Worx Landroid</button>
-                <button type="button" onclick="quickBrand('folletto')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Folletto</button>
+                <span class="text-slate-500 py-1 font-medium">Cataloghi per marca:</span>
+                {brand_pills}
             </div>
         </div>
     </section>
 
     <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <!-- Schede Categoria -->
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div class="flex flex-wrap gap-2" id="catTabs">
                 <button type="button" onclick="setCategory('all', this)" class="cat-btn bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">Tutti ({len(db)})</button>
@@ -549,7 +746,7 @@ def generate_index_page(db, today_str):
         </div>
     </main>
 
-    {get_footer()}
+    {get_footer(brands_list)}
 
     <script>
     let currentCat = 'all';
@@ -560,12 +757,6 @@ def generate_index_page(db, today_str):
             b.className = 'cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition';
         }});
         btn.className = 'cat-btn bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition';
-        filterModels();
-    }}
-
-    function quickBrand(brand) {{
-        const input = document.getElementById('searchInput');
-        input.value = brand;
         filterModels();
     }}
 
@@ -610,12 +801,30 @@ def ping_indexnow(url_list):
 
 def main():
     os.makedirs(os.path.join(OUTPUT_DIR, "modello"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "guida"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "marca"), exist_ok=True)
+
     today_str = datetime.now().strftime("%d/%m/%Y")
     today_iso = datetime.now().strftime("%Y-%m-%d")
     rss_date = datetime.now().strftime("%a, %d %b %Y 03:00:00 +0000")
 
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
+
+    # Raggruppa marche per Hub SEO
+    brands_map = {}
+    for item in db:
+        b_name = item["marca"]
+        b_slug = slugify(b_name)
+        if b_slug not in brands_map:
+            brands_map[b_slug] = {"name": b_name, "slug": b_slug, "items": []}
+        brands_map[b_slug]["items"].append(item)
+
+    brands_list = sorted(
+        [{"name": v["name"], "slug": v["slug"], "count": len(v["items"])} for v in brands_map.values()],
+        key=lambda x: x["count"],
+        reverse=True
+    )
 
     ai_calls = 0
     db_modified = False
@@ -638,26 +847,48 @@ def main():
             item["nota_tecnica_ai"] = fb["nota_tecnica"]
             item["faq_ai"] = fb["faq"]
 
-        page_html = generate_model_page(item, db, today_str)
+        # 1. Scheda Modello
+        page_html = generate_model_page(item, db, brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "modello", f"{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(page_html)
+
+        # 2. Guida Guasti e Sostituzione
+        guide_html = generate_guide_page(item, brands_list, today_str)
+        with open(os.path.join(OUTPUT_DIR, "guida", f"sostituzione-batteria-{item['id']}.html"), "w", encoding="utf-8") as out:
+            out.write(guide_html)
 
     if db_modified:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
 
-    index_html = generate_index_page(db, today_str)
+    # 3. Pagine Hub per Marca
+    for b_slug, b_data in brands_map.items():
+        brand_html = generate_brand_page(b_data, b_data["items"], brands_list, today_str)
+        with open(os.path.join(OUTPUT_DIR, "marca", f"{b_slug}.html"), "w", encoding="utf-8") as out:
+            out.write(brand_html)
+
+    # 4. Home Page
+    index_html = generate_index_page(db, brands_list, today_str)
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as out:
         out.write(index_html)
 
+    # 5. Sitemap.xml e Feed RSS completi
     all_urls = [f"{DOMINIO_SITO}/index.html"]
     urls_xml = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
     rss_items = []
 
+    for b in brands_list:
+        b_url = f"{DOMINIO_SITO}/marca/{b['slug']}.html"
+        all_urls.append(b_url)
+        urls_xml.append(f"<url><loc>{b_url}</loc><lastmod>{today_iso}</lastmod><priority>0.85</priority></url>")
+
     for item in db:
         page_url = f"{DOMINIO_SITO}/modello/{item['id']}.html"
-        all_urls.append(page_url)
+        guide_url = f"{DOMINIO_SITO}/guida/sostituzione-batteria-{item['id']}.html"
+        all_urls.extend([page_url, guide_url])
         urls_xml.append(f"<url><loc>{page_url}</loc><lastmod>{today_iso}</lastmod><priority>0.8</priority></url>")
+        urls_xml.append(f"<url><loc>{guide_url}</loc><lastmod>{today_iso}</lastmod><priority>0.75</priority></url>")
+
         safe_title = html.escape(f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']})")
         safe_desc = html.escape(f"Specifiche verificate: {item['specifiche_batteria']}, misure {item['dimensioni_mm']}. Consumabili: {item['consumabili_inclusi']}.")
         rss_items.append(f"<item><title>{safe_title}</title><link>{page_url}</link><guid>{page_url}</guid><pubDate>{rss_date}</pubDate><description>{safe_desc}</description></item>")
@@ -690,7 +921,7 @@ def main():
 
     ping_indexnow(all_urls)
 
-    print(f"Portale generato con successo: {len(db)} pagine aggiornate con nuovo design.")
+    print(f"Portale generato con successo: {len(all_urls)} pagine totali indicizzabili.")
 
 
 if __name__ == "__main__":
