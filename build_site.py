@@ -25,6 +25,47 @@ def slugify(text):
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def parse_price_range(price_str):
+    """Estrae prezzo minimo e massimo (es. '38€ - 55€' -> '38.00', '55.00') per i Rich Snippets Google."""
+    nums = re.findall(r"\d+(?:[.,]\d+)?", str(price_str))
+    if len(nums) >= 2:
+        low = float(nums[0].replace(",", "."))
+        high = float(nums[1].replace(",", "."))
+        return f"{min(low, high):.2f}", f"{max(low, high):.2f}"
+    if len(nums) == 1:
+        val = float(nums[0].replace(",", "."))
+        return f"{val:.2f}", f"{val:.2f}"
+    return "25.00", "65.00"
+
+
+def get_cat_group(categoria):
+    cat_lower = categoria.lower()
+    if "tagliaerba" in cat_lower:
+        return "robot-tagliaerba"
+    if "scopa" in cat_lower or "lavapavimenti" in cat_lower:
+        return "scope-senza-fili"
+    return "robot-aspirapolvere"
+
+
+CATEGORIES_META = {
+    "robot-aspirapolvere": {
+        "name": "Robot Aspirapolvere e Lavapavimenti",
+        "short": "Robot Aspirapolvere",
+        "desc": "Database tecnico di batterie OEM, filtri HEPA, panni rotanti e spazzole compatibili per robot aspirapolvere e lavapavimenti."
+    },
+    "scope-senza-fili": {
+        "name": "Scope Elettriche e Lavapavimenti Senza Fili",
+        "short": "Scope Senza Fili",
+        "desc": "Codici batteria originali e compatibili, filtri lavabili e rulli per scope elettriche senza fili Dyson, Folletto, Tineco, Rowenta e Samsung."
+    },
+    "robot-tagliaerba": {
+        "name": "Robot Tagliaerba Automatici",
+        "short": "Robot Tagliaerba",
+        "desc": "Batterie al litio 18V/20V/25.9V e kit lame in titanio o acciaio inox compatibili per robot rasaerba Worx, Husqvarna, Gardena, Bosch e Parkside."
+    }
+}
+
+
 def call_gemini_ai(item):
     """Chiama Gemini Flash gratis per generare note di compatibilita e FAQ tecniche uniche."""
     if not GEMINI_API_KEY:
@@ -143,11 +184,14 @@ def get_navbar(today_str):
                     <span class="text-[10px] font-medium uppercase tracking-widest text-emerald-400">Database Tecnico OEM</span>
                 </div>
             </a>
-            <div class="flex items-center gap-3">
-                <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-300">
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span class="hidden md:inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     Listino verificato: {today_str}
                 </span>
+                <a href="/categoria/robot-aspirapolvere.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Robot</a>
+                <a href="/categoria/scope-senza-fili.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Scope</a>
+                <a href="/categoria/robot-tagliaerba.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Tagliaerba</a>
                 <a href="/index.html" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
                     Catalogo
                 </a>
@@ -158,13 +202,22 @@ def get_navbar(today_str):
 
 def get_footer(brands_list):
     brand_links = " &middot; ".join(
-        [f'<a href="/marca/{b["slug"]}.html" class="hover:text-emerald-400 transition">{b["name"]}</a>' for b in brands_list[:10]]
+        [f'<a href="/marca/{b["slug"]}.html" class="hover:text-emerald-400 transition">{b["name"]}</a>' for b in brands_list[:14]]
+    )
+    cat_links = " &middot; ".join(
+        [f'<a href="/categoria/{slug}.html" class="hover:text-emerald-400 transition">{meta["name"]}</a>' for slug, meta in CATEGORIES_META.items()]
     )
     return f"""<footer class="bg-slate-950 text-slate-400 border-t border-slate-800 mt-16">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-            <div class="mb-8 pb-6 border-b border-slate-800/80">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Archivio Ricambi per Marca</p>
-                <div class="text-xs text-slate-400 leading-relaxed">{brand_links}</div>
+            <div class="mb-6 pb-6 border-b border-slate-800/80 space-y-4">
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Categorie Principali</p>
+                    <div class="text-xs text-slate-300 leading-relaxed">{cat_links}</div>
+                </div>
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Archivio Ricambi per Marca</p>
+                    <div class="text-xs text-slate-400 leading-relaxed">{brand_links}</div>
+                </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-800/80 text-xs leading-relaxed">
                 <div>
@@ -186,6 +239,19 @@ def get_footer(brands_list):
             </div>
         </div>
     </footer>"""
+
+
+def get_mobile_sticky_bar(amz_batt_url, amz_kit_url):
+    return f"""<div class="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-3 py-2.5 shadow-2xl">
+        <div class="grid grid-cols-2 gap-2">
+            <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 text-slate-950 font-extrabold text-xs py-2.5 px-3 rounded-lg shadow">
+                Batteria Amazon &rarr;
+            </a>
+            <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-500 text-slate-950 font-extrabold text-xs py-2.5 px-3 rounded-lg shadow">
+                Kit Ricambi &rarr;
+            </a>
+        </div>
+    </div>"""
 
 
 def get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url):
@@ -235,9 +301,11 @@ def get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, e
 def generate_model_page(item, db, brands_list, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
     brand_slug = slugify(item["marca"])
+    cat_slug = get_cat_group(item["categoria"])
     title = f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Scheda {today_str}"
     desc = f"Compatibilità verificata {item['marca']} {item['modello']}: codice batteria OEM {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e confronto prezzi."
     oem_safe = item["codice_oem_batteria"].replace("'", "")
+    low_p, high_p = parse_price_range(item["fascia_prezzo_ricambio"])
 
     related = [x for x in db if x["marca"].lower() == item["marca"].lower() and x["id"] != item["id"]]
     if len(related) < 4:
@@ -273,17 +341,45 @@ def generate_model_page(item, db, brands_list, today_str):
         </div>
         """
 
-    schema_json = json.dumps({
+    schemas_graph = json.dumps({
         "@context": "https://schema.org",
-        "@type": "FAQPage",
-        "mainEntity": faq_schema_items
+        "@graph": [
+            {
+                "@type": "Product",
+                "name": f"Batteria e Kit Ricambi Compatibili {item['marca']} {item['modello']}",
+                "description": desc,
+                "brand": {"@type": "Brand", "name": item["marca"]},
+                "mpn": item["codice_oem_batteria"].split("/")[0].strip(),
+                "category": item["categoria"],
+                "offers": {
+                    "@type": "AggregateOffer",
+                    "priceCurrency": "EUR",
+                    "lowPrice": low_p,
+                    "highPrice": high_p,
+                    "offerCount": "4",
+                    "availability": "https://schema.org/InStock"
+                }
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Catalogo", "item": f"{DOMINIO_SITO}/index.html"},
+                    {"@type": "ListItem", "position": 2, "name": item["marca"], "item": f"{DOMINIO_SITO}/marca/{brand_slug}.html"},
+                    {"@type": "ListItem", "position": 3, "name": item["modello"], "item": f"{DOMINIO_SITO}/modello/{item['id']}.html"}
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": faq_schema_items
+            }
+        ]
     }, ensure_ascii=False)
 
     head_html = get_head_assets(
         title,
         desc,
         f"{DOMINIO_SITO}/modello/{item['id']}.html",
-        f'<script type="application/ld+json">{schema_json}</script>'
+        f'<script type="application/ld+json">{schemas_graph}</script>'
     )
 
     buttons_html = get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url)
@@ -293,12 +389,14 @@ def generate_model_page(item, db, brands_list, today_str):
 <head>
     {head_html}
 </head>
-<body class="bg-slate-100/80 text-slate-800 font-sans antialiased selection:bg-emerald-200 selection:text-slate-900">
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased pb-16 sm:pb-0 selection:bg-emerald-200 selection:text-slate-900">
     {get_navbar(today_str)}
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
             <a href="/index.html" class="hover:text-slate-900 transition">Catalogo</a>
+            <span>/</span>
+            <a href="/categoria/{cat_slug}.html" class="hover:text-emerald-700 transition">{CATEGORIES_META[cat_slug]['short']}</a>
             <span>/</span>
             <a href="/marca/{brand_slug}.html" class="hover:text-emerald-700 transition">{item['marca']}</a>
             <span>/</span>
@@ -312,7 +410,7 @@ def generate_model_page(item, db, brands_list, today_str):
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                         COMPATIBILITÀ VERIFICATA
                     </span>
-                    <span class="text-xs font-medium text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full">{item['categoria']}</span>
+                    <a href="/categoria/{cat_slug}.html" class="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 px-2.5 py-1 rounded-full transition">{item['categoria']}</a>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                     Batteria e Ricambi {item['marca']} {item['modello']}
@@ -366,7 +464,6 @@ def generate_model_page(item, db, brands_list, today_str):
 
                 {buttons_html}
 
-                <!-- Collegamento alla guida guasti e montaggio -->
                 <div class="mb-7 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <p class="text-xs font-extrabold text-amber-950">LED lampeggiante o errore batteria su {item['modello']}?</p>
@@ -430,6 +527,7 @@ def generate_model_page(item, db, brands_list, today_str):
     </main>
 
     {get_footer(brands_list)}
+    {get_mobile_sticky_bar(amz_batt_url, amz_kit_url)}
 
     <script>
     function evidenziaRicambio(tipo) {{
@@ -463,7 +561,6 @@ def generate_model_page(item, db, brands_list, today_str):
 
 
 def generate_guide_page(item, brands_list, today_str):
-    """Seconda pagina SEO automatica per ogni modello: guida guasti, LED lampeggiante e sostituzione."""
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item, suffix="guida")
     brand_slug = slugify(item["marca"])
     title = f"Sostituzione Batteria e Reset Errore {item['marca']} {item['modello']} - Guida {today_str}"
@@ -524,7 +621,7 @@ def generate_guide_page(item, brands_list, today_str):
 <head>
     {head_html}
 </head>
-<body class="bg-slate-100/80 text-slate-800 font-sans antialiased">
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased pb-16 sm:pb-0">
     {get_navbar(today_str)}
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -579,12 +676,12 @@ def generate_guide_page(item, brands_list, today_str):
     </main>
 
     {get_footer(brands_list)}
+    {get_mobile_sticky_bar(amz_batt_url, amz_kit_url)}
 </body>
 </html>"""
 
 
 def generate_brand_page(brand_info, brand_items, brands_list, today_str):
-    """Pagina Hub SEO per singola marca (es. /marca/dyson.html)."""
     brand_name = brand_info["name"]
     brand_slug = brand_info["slug"]
     title = f"Batterie e Ricambi Compatibili {brand_name} - Catalogo OEM {today_str}"
@@ -648,18 +745,77 @@ def generate_brand_page(brand_info, brand_items, brands_list, today_str):
 </html>"""
 
 
+def generate_category_page(cat_slug, cat_meta, cat_items, brands_list, today_str):
+    title = f"Batterie e Ricambi Compatibili {cat_meta['name']} - Archivio {today_str}"
+    desc = cat_meta["desc"]
+
+    cards_html = ""
+    for item in cat_items:
+        cards_html += f"""
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">{item['marca']}</span>
+                    <span class="text-[11px] text-slate-400">{item['fascia_prezzo_ricambio']}</span>
+                </div>
+                <h2 class="text-base font-extrabold text-slate-900 mt-2.5">{item['modello']}</h2>
+                <p class="text-xs font-mono text-slate-600 mt-1.5">OEM: <strong>{item['codice_oem_batteria'].split('/')[0].strip()}</strong></p>
+                <p class="text-xs text-slate-500 mt-1">{item['specifiche_batteria']}</p>
+            </div>
+            <div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                <a href="/modello/{item['id']}.html" class="text-xs font-bold text-white bg-slate-900 hover:bg-emerald-600 px-3.5 py-2 rounded-lg transition">
+                    Scheda &rarr;
+                </a>
+                <a href="/guida/sostituzione-batteria-{item['id']}.html" class="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                    Guida cambio
+                </a>
+            </div>
+        </div>
+        """
+
+    head_html = get_head_assets(
+        title,
+        desc,
+        f"{DOMINIO_SITO}/categoria/{cat_slug}.html"
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+    {head_html}
+</head>
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased">
+    {get_navbar(today_str)}
+
+    <section class="bg-slate-950 text-white border-b border-slate-800 py-10 px-4 sm:px-6">
+        <div class="max-w-5xl mx-auto">
+            <nav class="text-xs text-slate-400 mb-3">
+                <a href="/index.html" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{cat_meta['short']}</span>
+            </nav>
+            <h1 class="text-2xl sm:text-4xl font-extrabold text-white">{cat_meta['name']}</h1>
+            <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl">
+                {cat_meta['desc']} ({len(cat_items)} modelli verificati).
+            </p>
+        </div>
+    </section>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cards_html}
+        </div>
+    </main>
+
+    {get_footer(brands_list)}
+</body>
+</html>"""
+
+
 def generate_index_page(db, brands_list, today_str):
     cards_html = ""
     for item in db:
-        cat_lower = item["categoria"].lower()
-        cat_group = "robot"
-        if "tagliaerba" in cat_lower:
-            cat_group = "tagliaerba"
-        elif "scopa" in cat_lower or "lavapavimenti" in cat_lower:
-            cat_group = "scopa"
-
+        cat_group = get_cat_group(item["categoria"])
         cards_html += f"""
-        <a href="/modello/{item['id']}.html" class="model-card group flex flex-col justify-between bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-500 hover:shadow-lg hover:-translate-y-0.5 transition-all" data-cat="{cat_group}" data-search="{item['marca'].lower()} {item['modello'].lower()} {item['codice_oem_batteria'].lower()} {cat_lower}">
+        <a href="/modello/{item['id']}.html" class="model-card group flex flex-col justify-between bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-500 hover:shadow-lg hover:-translate-y-0.5 transition-all" data-cat="{cat_group}" data-search="{item['marca'].lower()} {item['modello'].lower()} {item['codice_oem_batteria'].lower()} {item['categoria'].lower()}">
             <div>
                 <div class="flex items-center justify-between gap-2 mb-3">
                     <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 rounded-full">{item['marca']}</span>
@@ -692,7 +848,7 @@ def generate_index_page(db, brands_list, today_str):
     )
 
     brand_pills = "".join(
-        [f'<a href="/marca/{b["slug"]}.html" class="bg-slate-900 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-800 px-3 py-1 rounded-full transition">{b["name"]} ({b["count"]})</a>' for b in brands_list[:8]]
+        [f'<a href="/marca/{b["slug"]}.html" class="bg-slate-900 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-800 px-3 py-1 rounded-full transition">{b["name"]} ({b["count"]})</a>' for b in brands_list[:10]]
     )
 
     return f"""<!DOCTYPE html>
@@ -734,9 +890,9 @@ def generate_index_page(db, brands_list, today_str):
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div class="flex flex-wrap gap-2" id="catTabs">
                 <button type="button" onclick="setCategory('all', this)" class="cat-btn bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">Tutti ({len(db)})</button>
-                <button type="button" onclick="setCategory('robot', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Aspirapolvere</button>
-                <button type="button" onclick="setCategory('scopa', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Scope Senza Fili</button>
-                <button type="button" onclick="setCategory('tagliaerba', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Tagliaerba</button>
+                <button type="button" onclick="setCategory('robot-aspirapolvere', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Aspirapolvere</button>
+                <button type="button" onclick="setCategory('scope-senza-fili', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Scope Senza Fili</button>
+                <button type="button" onclick="setCategory('robot-tagliaerba', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Tagliaerba</button>
             </div>
             <p id="resultsCounter" class="text-xs font-semibold text-slate-500">Visualizzati: {len(db)} modelli</p>
         </div>
@@ -803,6 +959,7 @@ def main():
     os.makedirs(os.path.join(OUTPUT_DIR, "modello"), exist_ok=True)
     os.makedirs(os.path.join(OUTPUT_DIR, "guida"), exist_ok=True)
     os.makedirs(os.path.join(OUTPUT_DIR, "marca"), exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT_DIR, "categoria"), exist_ok=True)
 
     today_str = datetime.now().strftime("%d/%m/%Y")
     today_iso = datetime.now().strftime("%Y-%m-%d")
@@ -811,14 +968,18 @@ def main():
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
 
-    # Raggruppa marche per Hub SEO
     brands_map = {}
+    cats_map = {k: [] for k in CATEGORIES_META.keys()}
+
     for item in db:
         b_name = item["marca"]
         b_slug = slugify(b_name)
         if b_slug not in brands_map:
             brands_map[b_slug] = {"name": b_name, "slug": b_slug, "items": []}
         brands_map[b_slug]["items"].append(item)
+
+        c_slug = get_cat_group(item["categoria"])
+        cats_map[c_slug].append(item)
 
     brands_list = sorted(
         [{"name": v["name"], "slug": v["slug"], "count": len(v["items"])} for v in brands_map.values()],
@@ -847,12 +1008,10 @@ def main():
             item["nota_tecnica_ai"] = fb["nota_tecnica"]
             item["faq_ai"] = fb["faq"]
 
-        # 1. Scheda Modello
         page_html = generate_model_page(item, db, brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "modello", f"{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(page_html)
 
-        # 2. Guida Guasti e Sostituzione
         guide_html = generate_guide_page(item, brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "guida", f"sostituzione-batteria-{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(guide_html)
@@ -861,21 +1020,28 @@ def main():
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
 
-    # 3. Pagine Hub per Marca
     for b_slug, b_data in brands_map.items():
         brand_html = generate_brand_page(b_data, b_data["items"], brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "marca", f"{b_slug}.html"), "w", encoding="utf-8") as out:
             out.write(brand_html)
 
-    # 4. Home Page
+    for c_slug, c_meta in CATEGORIES_META.items():
+        cat_html = generate_category_page(c_slug, c_meta, cats_map[c_slug], brands_list, today_str)
+        with open(os.path.join(OUTPUT_DIR, "categoria", f"{c_slug}.html"), "w", encoding="utf-8") as out:
+            out.write(cat_html)
+
     index_html = generate_index_page(db, brands_list, today_str)
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as out:
         out.write(index_html)
 
-    # 5. Sitemap.xml e Feed RSS completi
     all_urls = [f"{DOMINIO_SITO}/index.html"]
     urls_xml = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
     rss_items = []
+
+    for c_slug in CATEGORIES_META.keys():
+        c_url = f"{DOMINIO_SITO}/categoria/{c_slug}.html"
+        all_urls.append(c_url)
+        urls_xml.append(f"<url><loc>{c_url}</loc><lastmod>{today_iso}</lastmod><priority>0.9</priority></url>")
 
     for b in brands_list:
         b_url = f"{DOMINIO_SITO}/marca/{b['slug']}.html"
