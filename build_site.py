@@ -25,8 +25,17 @@ def slugify(text):
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def clean_search_term(text):
+    """Pulisce barre e parentesi per evitare ricerche a zero risultati su Amazon ed eBay."""
+    return text.split("/")[0].split("(")[0].strip()
+
+
+def is_wired_device(item):
+    spec = item.get("specifiche_batteria", "").lower()
+    return ("230v" in spec) or ("a filo" in spec)
+
+
 def parse_price_range(price_str):
-    """Estrae prezzo minimo e massimo (es. '38€ - 55€' -> '38.00', '55.00') per i Rich Snippets Google."""
     nums = re.findall(r"\d+(?:[.,]\d+)?", str(price_str))
     if len(nums) >= 2:
         low = float(nums[0].replace(",", "."))
@@ -74,15 +83,15 @@ def call_gemini_ai(item):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     prompt = f"""
     Sei un tecnico specializzato in ricambi elettronici. Scrivi in italiano per il modello {item['marca']} {item['modello']} ({item['categoria']}).
-    Dati tecnici noti: Codice batteria OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
+    Dati tecnici noti: Codice ricambio OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
     
     Restituisci ESCLUSAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
     {{
-      "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la polarita del connettore, quando sostituire la batteria e come evitare errori di montaggio.",
+      "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la compatibilita del ricambio, quando sostituirlo e come evitare errori di montaggio.",
       "faq": [
         {{"q": "Domanda tecnica specifica sul ricambio 1?", "a": "Risposta diretta e precisa di 30 parole."}},
         {{"q": "Domanda tecnica sulla durata o compatibilita 2?", "a": "Risposta diretta e precisa di 30 parole."}},
-        {{"q": "Come resettare l'errore batteria dopo il cambio su {item['modello']}?", "a": "Risposta procedurale di 30 parole."}}
+        {{"q": "Come ripristinare le prestazioni ottimali dopo il cambio ricambi su {item['modello']}?", "a": "Risposta procedurale di 30 parole."}}
       ]
     }}
     """
@@ -102,40 +111,47 @@ def call_gemini_ai(item):
 
 
 def get_fallback_content(item):
-    """Contenuto tecnico strutturato di sicurezza se l'API AI non e ancora attiva."""
     nota = (
-        f"Per il modello {item['marca']} {item['modello']}, è fondamentale verificare che la batteria sostitutiva "
+        f"Per il modello {item['marca']} {item['modello']}, è fondamentale verificare che il ricambio sostitutivo "
         f"rispetti il codice originale {item['codice_oem_batteria']} e le specifiche {item['specifiche_batteria']}. "
-        f"Controllare sempre le dimensioni del vano ({item['dimensioni_mm']}) e la corrispondenza del connettore prima dell'acquisto. "
-        f"Al primo montaggio, effettuare un ciclo di carica completa di almeno 6 ore consecutive."
+        f"Controllare sempre le dimensioni del vano ({item['dimensioni_mm']}) e la corrispondenza degli attacchi prima dell'acquisto. "
+        f"In caso di sostituzione batteria, effettuare un ciclo di carica completa di almeno 6 ore consecutive."
     )
     faq = [
         {
-            "q": f"Qual è il codice batteria originale per {item['marca']} {item['modello']}?",
-            "a": f"Il codice OEM di riferimento è {item['codice_oem_batteria']} con specifiche elettriche {item['specifiche_batteria']} e ingombro {item['dimensioni_mm']}."
+            "q": f"Qual è il codice ricambio originale per {item['marca']} {item['modello']}?",
+            "a": f"Il codice OEM di riferimento è {item['codice_oem_batteria']} con specifiche {item['specifiche_batteria']} e ingombro {item['dimensioni_mm']}."
         },
         {
-            "q": f"Posso montare una batteria compatibile maggiorata su {item['modello']}?",
-            "a": "Sì, purché la tensione nominale (Volt) sia identica all'originale e il circuito BMS integrato sia compatibile con la scheda madre del dispositivo."
+            "q": f"Posso montare ricambi compatibili certificati su {item['modello']}?",
+            "a": "Sì, purché i parametri elettrici e gli attacchi meccanici siano identici all'originale per preservare motore e scheda elettronica."
         },
         {
             "q": f"Ogni quanto vanno sostituiti i consumabili ({item['consumabili_inclusi']})?",
-            "a": "I filtri HEPA e le spazzole laterali vanno sostituiti ogni 3-4 mesi di utilizzo, mentre il rullo centrale e le lame ogni 6-12 mesi per non sforzare il motore."
+            "a": "I filtri HEPA e le spazzole laterali vanno sostituiti ogni 3-4 mesi di utilizzo, mentre rulli, sacchetti e lame vanno rinnovati regolarmente per non sforzare il motore."
         }
     ]
     return {"nota_tecnica": nota, "faq": faq}
 
 
 def build_affiliate_links(item, suffix=""):
-    q_batt = urllib.parse.quote_plus(f"batteria {item['marca']} {item['modello']}")
+    clean_mod = clean_search_term(item["modello"])
+    clean_oem = clean_search_term(item["codice_oem_batteria"])
+
+    if is_wired_device(item):
+        raw_primary = f"ricambi {item['marca']} {clean_mod} {clean_oem}"
+    else:
+        raw_primary = f"batteria {item['marca']} {clean_mod} {clean_oem}"
+
+    q_primary = urllib.parse.quote_plus(raw_primary)
     q_amz_kit = urllib.parse.quote_plus(item["query_amazon"].replace("+", " "))
     q_eby_kit = urllib.parse.quote_plus(item["query_ebay"].replace("+", " "))
 
     tag_suffix = f"-{suffix}" if suffix else ""
-    amz_batt_url = f"https://www.amazon.it/s?k={q_batt}&tag={AMAZON_TAG}"
+    amz_batt_url = f"https://www.amazon.it/s?k={q_primary}&tag={AMAZON_TAG}"
     eby_batt_url = (
-        f"https://www.ebay.it/sch/i.html?_nkw={q_batt}"
-        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-batt{tag_suffix}&toolid=10001&mkevt=1"
+        f"https://www.ebay.it/sch/i.html?_nkw={q_primary}"
+        f"&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid={EBAY_CAMPID}&customid={item['id']}-pri{tag_suffix}&toolid=10001&mkevt=1"
     )
     amz_kit_url = f"https://www.amazon.it/s?k={q_amz_kit}&tag={AMAZON_TAG}"
     eby_kit_url = (
@@ -173,7 +189,7 @@ def get_head_assets(title, desc, canonical_url, extra_head=""):
 def get_navbar(today_str):
     return f"""<header class="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
-            <a href="/index.html" class="flex items-center gap-2.5 group">
+            <a href="/" class="flex items-center gap-2.5 group">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <svg class="w-5 h-5 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
@@ -192,7 +208,7 @@ def get_navbar(today_str):
                 <a href="/categoria/robot-aspirapolvere.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Robot</a>
                 <a href="/categoria/scope-senza-fili.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Scope</a>
                 <a href="/categoria/robot-tagliaerba.html" class="hidden sm:inline-block text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1.5 transition">Tagliaerba</a>
-                <a href="/index.html" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
+                <a href="/" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
                     Catalogo
                 </a>
             </div>
@@ -202,7 +218,7 @@ def get_navbar(today_str):
 
 def get_footer(brands_list):
     brand_links = " &middot; ".join(
-        [f'<a href="/marca/{b["slug"]}.html" class="hover:text-emerald-400 transition">{b["name"]}</a>' for b in brands_list[:14]]
+        [f'<a href="/marca/{b["slug"]}.html" class="hover:text-emerald-400 transition">{b["name"]}</a>' for b in brands_list[:15]]
     )
     cat_links = " &middot; ".join(
         [f'<a href="/categoria/{slug}.html" class="hover:text-emerald-400 transition">{meta["name"]}</a>' for slug, meta in CATEGORIES_META.items()]
@@ -222,7 +238,7 @@ def get_footer(brands_list):
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-800/80 text-xs leading-relaxed">
                 <div>
                     <p class="text-white font-bold text-sm mb-2">{NOME_PORTALE} Italia</p>
-                    <p class="text-slate-400">Archivio indipendente di specifiche elettriche, ingombri e codici ricambio OEM per robot aspirapolvere, tagliaerba automatici e scope elettriche senza fili.</p>
+                    <p class="text-slate-400">Archivio indipendente di specifiche elettriche, ingombri e codici ricambio OEM per robot aspirapolvere, tagliaerba automatici e scope elettriche.</p>
                 </div>
                 <div>
                     <p class="text-white font-bold text-sm mb-2">Metodologia di Verifica</p>
@@ -235,42 +251,48 @@ def get_footer(brands_list):
             </div>
             <div class="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
                 <p>&copy; {datetime.now().year} {NOME_PORTALE} — Tutti i marchi citati appartengono ai rispettivi proprietari.</p>
-                <a href="/index.html" class="text-emerald-400 hover:text-emerald-300 font-medium">Torna all'indice dei modelli &uarr;</a>
+                <a href="/" class="text-emerald-400 hover:text-emerald-300 font-medium">Torna all'indice dei modelli &uarr;</a>
             </div>
         </div>
     </footer>"""
 
 
-def get_mobile_sticky_bar(amz_batt_url, amz_kit_url):
+def get_mobile_sticky_bar(item, amz_batt_url, amz_kit_url):
+    pri_label = "Ricambi Amazon &rarr;" if is_wired_device(item) else "Batteria Amazon &rarr;"
     return f"""<div class="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-3 py-2.5 shadow-2xl">
         <div class="grid grid-cols-2 gap-2">
             <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 text-slate-950 font-extrabold text-xs py-2.5 px-3 rounded-lg shadow">
-                Batteria Amazon &rarr;
+                {pri_label}
             </a>
             <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-500 text-slate-950 font-extrabold text-xs py-2.5 px-3 rounded-lg shadow">
-                Kit Ricambi &rarr;
+                Kit Completo &rarr;
             </a>
         </div>
     </div>"""
 
 
 def get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url):
+    wired = is_wired_device(item)
+    pri_title = f"Ricambio Principale ({item['codice_oem_batteria']})" if wired else f"Batteria Compatibile ({item['codice_oem_batteria']})"
+    pri_amz_btn = "Cerca Ricambio su Amazon.it" if wired else "Verifica Batteria su Amazon.it"
+    pri_eby_btn = "Confronta Ricambio su eBay.it" if wired else "Confronta Batteria su eBay.it"
+
     return f"""<div class="space-y-4 mb-7">
         <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
                     <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
-                    <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile ({item['codice_oem_batteria']})</h2>
+                    <h2 class="text-base font-extrabold text-slate-900 mt-1">{pri_title}</h2>
                 </div>
                 <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                    <span>Verifica su Amazon.it</span>
+                    <span>{pri_amz_btn}</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
                 </a>
                 <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                    <span>Confronta su eBay.it</span>
+                    <span>{pri_eby_btn}</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
                 </a>
             </div>
@@ -298,15 +320,7 @@ def get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, e
     </div>"""
 
 
-def generate_model_page(item, db, brands_list, today_str):
-    amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
-    brand_slug = slugify(item["marca"])
-    cat_slug = get_cat_group(item["categoria"])
-    title = f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Scheda {today_str}"
-    desc = f"Compatibilità verificata {item['marca']} {item['modello']}: codice batteria OEM {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e confronto prezzi."
-    oem_safe = item["codice_oem_batteria"].replace("'", "")
-    low_p, high_p = parse_price_range(item["fascia_prezzo_ricambio"])
-
+def get_related_grid(item, db):
     related = [x for x in db if x["marca"].lower() == item["marca"].lower() and x["id"] != item["id"]]
     if len(related) < 4:
         same_cat = [x for x in db if x["categoria"] == item["categoria"] and x["id"] != item["id"] and x not in related]
@@ -322,6 +336,22 @@ def generate_model_page(item, db, brands_list, today_str):
             <p class="text-xs font-mono text-slate-500 mt-1.5 truncate">OEM: {rel['codice_oem_batteria']}</p>
         </a>
         """
+    return related_html
+
+
+def generate_model_page(item, db, brands_list, today_str):
+    amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
+    brand_slug = slugify(item["marca"])
+    cat_slug = get_cat_group(item["categoria"])
+    wired = is_wired_device(item)
+
+    title_prefix = "Ricambi e Consumabili" if wired else "Batteria e Ricambi"
+    title = f"{title_prefix} {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Scheda {today_str}"
+    desc = f"Compatibilità verificata {item['marca']} {item['modello']}: codice OEM {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e confronto prezzi."
+    oem_safe = item["codice_oem_batteria"].replace("'", "")
+    low_p, high_p = parse_price_range(item["fascia_prezzo_ricambio"])
+
+    related_html = get_related_grid(item, db)
 
     faq_schema_items = []
     faq_html_items = ""
@@ -346,10 +376,10 @@ def generate_model_page(item, db, brands_list, today_str):
         "@graph": [
             {
                 "@type": "Product",
-                "name": f"Batteria e Kit Ricambi Compatibili {item['marca']} {item['modello']}",
+                "name": f"{title_prefix} Compatibili {item['marca']} {item['modello']}",
                 "description": desc,
                 "brand": {"@type": "Brand", "name": item["marca"]},
-                "mpn": item["codice_oem_batteria"].split("/")[0].strip(),
+                "mpn": clean_search_term(item["codice_oem_batteria"]),
                 "category": item["categoria"],
                 "offers": {
                     "@type": "AggregateOffer",
@@ -363,7 +393,7 @@ def generate_model_page(item, db, brands_list, today_str):
             {
                 "@type": "BreadcrumbList",
                 "itemListElement": [
-                    {"@type": "ListItem", "position": 1, "name": "Catalogo", "item": f"{DOMINIO_SITO}/index.html"},
+                    {"@type": "ListItem", "position": 1, "name": "Catalogo", "item": f"{DOMINIO_SITO}/"},
                     {"@type": "ListItem", "position": 2, "name": item["marca"], "item": f"{DOMINIO_SITO}/marca/{brand_slug}.html"},
                     {"@type": "ListItem", "position": 3, "name": item["modello"], "item": f"{DOMINIO_SITO}/modello/{item['id']}.html"}
                 ]
@@ -394,7 +424,7 @@ def generate_model_page(item, db, brands_list, today_str):
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
-            <a href="/index.html" class="hover:text-slate-900 transition">Catalogo</a>
+            <a href="/" class="hover:text-slate-900 transition">Catalogo</a>
             <span>/</span>
             <a href="/categoria/{cat_slug}.html" class="hover:text-emerald-700 transition">{CATEGORIES_META[cat_slug]['short']}</a>
             <span>/</span>
@@ -413,10 +443,10 @@ def generate_model_page(item, db, brands_list, today_str):
                     <a href="/categoria/{cat_slug}.html" class="text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 px-2.5 py-1 rounded-full transition">{item['categoria']}</a>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                    Batteria e Ricambi {item['marca']} {item['modello']}
+                    {title_prefix} {item['marca']} {item['modello']}
                 </h1>
                 <p class="text-slate-300 text-sm mt-2 max-w-2xl leading-relaxed">
-                    Scheda tecnica di riferimento con codice OEM della batteria, dimensioni esatte del vano e kit consumabili compatibili.
+                    Scheda tecnica di riferimento con codice OEM, dimensioni esatte e kit consumabili compatibili al 100%.
                 </p>
             </div>
 
@@ -427,11 +457,11 @@ def generate_model_page(item, db, brands_list, today_str):
                         <p class="font-mono text-sm font-bold text-emerald-700 mt-1 break-words">{item['codice_oem_batteria']}</p>
                     </div>
                     <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Specifiche Elettriche</p>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Specifiche Tecniche</p>
                         <p class="text-xs font-bold text-slate-900 mt-1 leading-snug">{item['specifiche_batteria']}</p>
                     </div>
                     <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ingombro Vano</p>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Dimensioni / Misure</p>
                         <p class="font-mono text-xs font-bold text-slate-900 mt-1">{item['dimensioni_mm']}</p>
                     </div>
                     <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
@@ -448,7 +478,7 @@ def generate_model_page(item, db, brands_list, today_str):
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         <button type="button" onclick="evidenziaRicambio('batteria')" class="flex items-center gap-2 text-left text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 px-3.5 py-3 rounded-lg border border-slate-700 transition">
                             <span class="text-amber-400">&#9889;</span>
-                            <span>Autonomia ridotta / Non carica</span>
+                            <span>{"Ricambio principale / Sacchetti" if wired else "Autonomia ridotta / Non carica"}</span>
                         </button>
                         <button type="button" onclick="evidenziaRicambio('kit')" class="flex items-center gap-2 text-left text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 px-3.5 py-3 rounded-lg border border-slate-700 transition">
                             <span class="text-sky-400">&#128295;</span>
@@ -466,8 +496,8 @@ def generate_model_page(item, db, brands_list, today_str):
 
                 <div class="mb-7 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <p class="text-xs font-extrabold text-amber-950">LED lampeggiante o errore batteria su {item['modello']}?</p>
-                        <p class="text-xs text-amber-800 mt-0.5">Leggi la procedura passo-passo di sostituzione e reset del sistema BMS.</p>
+                        <p class="text-xs font-extrabold text-amber-950">Calo di prestazioni o manutenzione su {item['modello']}?</p>
+                        <p class="text-xs text-amber-800 mt-0.5">Leggi la procedura passo-passo di sostituzione e ripristino ottimale.</p>
                     </div>
                     <a href="/guida/sostituzione-batteria-{item['id']}.html" class="shrink-0 text-xs font-bold bg-amber-950 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg transition text-center">
                         Apri Guida Montaggio &rarr;
@@ -489,7 +519,7 @@ def generate_model_page(item, db, brands_list, today_str):
                                 <td class="py-3 px-4 font-mono text-emerald-700 font-bold">{item['codice_oem_batteria']}</td>
                             </tr>
                             <tr>
-                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Tensione e Capacità</th>
+                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Alimentazione / Specifiche</th>
                                 <td class="py-3 px-4 text-slate-800">{item['specifiche_batteria']}</td>
                             </tr>
                             <tr>
@@ -527,7 +557,7 @@ def generate_model_page(item, db, brands_list, today_str):
     </main>
 
     {get_footer(brands_list)}
-    {get_mobile_sticky_bar(amz_batt_url, amz_kit_url)}
+    {get_mobile_sticky_bar(item, amz_batt_url, amz_kit_url)}
 
     <script>
     function evidenziaRicambio(tipo) {{
@@ -541,17 +571,17 @@ def generate_model_page(item, db, brands_list, today_str):
         if (tipo === 'batteria') {{
             boxBatt.classList.remove('border-slate-200');
             boxBatt.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
-            msg.textContent = 'Ricambio consigliato: batteria compatibile con codice OEM {oem_safe}.';
+            msg.textContent = 'Ricambio consigliato: codice OEM {oem_safe}.';
         }} else if (tipo === 'kit') {{
             boxKit.classList.remove('border-slate-200');
             boxKit.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
-            msg.textContent = 'Ricambio consigliato: kit filtri, spazzole o lame per ripristinare la capacità di raccolta.';
+            msg.textContent = 'Ricambio consigliato: kit filtri, spazzole o consumabili per ripristinare la capacità di raccolta.';
         }} else {{
             boxBatt.classList.remove('border-slate-200');
             boxKit.classList.remove('border-slate-200');
             boxBatt.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
             boxKit.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
-            msg.textContent = 'Manutenzione completa: batteria nuova ({oem_safe}) + sostituzione consumabili usurati.';
+            msg.textContent = 'Manutenzione completa: ricambio principale ({oem_safe}) + sostituzione consumabili usurati.';
         }}
         msg.classList.remove('hidden');
     }}
@@ -560,44 +590,80 @@ def generate_model_page(item, db, brands_list, today_str):
 </html>"""
 
 
-def generate_guide_page(item, brands_list, today_str):
+def generate_guide_page(item, db, brands_list, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item, suffix="guida")
     brand_slug = slugify(item["marca"])
-    title = f"Sostituzione Batteria e Reset Errore {item['marca']} {item['modello']} - Guida {today_str}"
-    desc = f"Come sostituire la batteria ({item['codice_oem_batteria']}) e risolvere i problemi di ricarica o LED lampeggiante su {item['marca']} {item['modello']}."
+    wired = is_wired_device(item)
 
-    steps = [
-        {
-            "name": "Verifica codice OEM e tensione",
-            "text": f"Controlla sull'etichetta del pacco batteria originale il codice {item['codice_oem_batteria']} e la tensione {item['specifiche_batteria']}. Non utilizzare mai batterie con voltaggio differente."
-        },
-        {
-            "name": "Scollegamento in sicurezza e apertura vano",
-            "text": f"Spegni completamente {item['marca']} {item['modello']}, scollegalo dalla base di ricarica e rimuovi le viti del vano inferiore (ingombro previsto: {item['dimensioni_mm']})."
-        },
-        {
-            "name": "Installazione nuova batteria e pulizia contatti",
-            "text": f"Inserisci il nuovo pacco batteria verificando l'incastro del connettore. Approfitta dell'apertura per pulire i contatti metallici e sostituire i filtri usurati ({item['consumabili_inclusi']})."
-        },
-        {
-            "name": "Calibrazione e ciclo di carica iniziale",
-            "text": "Riposiziona il dispositivo sulla base e lascialo in carica continua per almeno 6 ore senza interruzioni per calibrare il circuito elettronico BMS."
-        }
-    ]
+    if wired:
+        title = f"Sostituzione Filtri, Sacchetti e Manutenzione {item['marca']} {item['modello']} - Guida {today_str}"
+        desc = f"Come sostituire filtri, sacchetti ({item['codice_oem_batteria']}) e accessori soggetti a usura su {item['marca']} {item['modello']}."
+        steps = [
+            {
+                "name": "Verifica codice OEM dei consumabili",
+                "text": f"Controlla la sigla originale {item['codice_oem_batteria']} prima dell'acquisto per assicurarti che l'aggancio del sacchetto o del tubo sia compatibile con {item['marca']} {item['modello']}."
+            },
+            {
+                "name": "Scollegamento dalla rete elettrica",
+                "text": f"Spegni {item['marca']} {item['modello']} e stacca sempre la spina dalla presa 230V prima di aprire il vano filtro o sganciare gli accessori."
+            },
+            {
+                "name": "Sostituzione filtri HEPA e consumabili",
+                "text": f"Rimuovi i componenti usurati ({item['consumabili_inclusi']}), pulisci l'alloggiamento interno con un panno asciutto e inserisci i nuovi ricambi fino allo scatto."
+            },
+            {
+                "name": "Test di aspirazione e tenuta",
+                "text": "Richiudi lo sportello verificando che le guarnizioni siano ben allineate e avvia il motore per controllare il ripristino del flusso d'aria."
+            }
+        ]
+    else:
+        title = f"Sostituzione Batteria e Reset Errore {item['marca']} {item['modello']} - Guida {today_str}"
+        desc = f"Come sostituire la batteria ({item['codice_oem_batteria']}) e risolvere i problemi di ricarica o LED lampeggiante su {item['marca']} {item['modello']}."
+        steps = [
+            {
+                "name": "Verifica codice OEM e tensione",
+                "text": f"Controlla sull'etichetta del pacco batteria originale il codice {item['codice_oem_batteria']} e la tensione {item['specifiche_batteria']}. Non utilizzare mai batterie con voltaggio differente."
+            },
+            {
+                "name": "Scollegamento in sicurezza e apertura vano",
+                "text": f"Spegni completamente {item['marca']} {item['modello']}, scollegalo dalla base di ricarica e rimuovi le viti del vano inferiore (ingombro previsto: {item['dimensioni_mm']})."
+            },
+            {
+                "name": "Installazione nuova batteria e pulizia contatti",
+                "text": f"Inserisci il nuovo pacco batteria verificando l'incastro del connettore. Approfitta dell'apertura per pulire i contatti metallici e sostituire i filtri usurati ({item['consumabili_inclusi']})."
+            },
+            {
+                "name": "Calibrazione e ciclo di carica iniziale",
+                "text": "Riposiziona il dispositivo sulla base e lascialo in carica continua per almeno 6 ore senza interruzioni per calibrare il circuito elettronico BMS."
+            }
+        ]
 
-    howto_schema = json.dumps({
+    schemas_graph = json.dumps({
         "@context": "https://schema.org",
-        "@type": "HowTo",
-        "name": f"Come sostituire la batteria su {item['marca']} {item['modello']}",
-        "description": desc,
-        "step": [{"@type": "HowToStep", "name": s["name"], "text": s["text"]} for s in steps]
+        "@graph": [
+            {
+                "@type": "HowTo",
+                "name": f"Manutenzione e cambio ricambi su {item['marca']} {item['modello']}",
+                "description": desc,
+                "step": [{"@type": "HowToStep", "name": s["name"], "text": s["text"]} for s in steps]
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Catalogo", "item": f"{DOMINIO_SITO}/"},
+                    {"@type": "ListItem", "position": 2, "name": item["marca"], "item": f"{DOMINIO_SITO}/marca/{brand_slug}.html"},
+                    {"@type": "ListItem", "position": 3, "name": item["modello"], "item": f"{DOMINIO_SITO}/modello/{item['id']}.html"},
+                    {"@type": "ListItem", "position": 4, "name": "Guida Manutenzione", "item": f"{DOMINIO_SITO}/guida/sostituzione-batteria-{item['id']}.html"}
+                ]
+            }
+        ]
     }, ensure_ascii=False)
 
     head_html = get_head_assets(
         title,
         desc,
         f"{DOMINIO_SITO}/guida/sostituzione-batteria-{item['id']}.html",
-        f'<script type="application/ld+json">{howto_schema}</script>'
+        f'<script type="application/ld+json">{schemas_graph}</script>'
     )
 
     steps_html = ""
@@ -615,6 +681,7 @@ def generate_guide_page(item, brands_list, today_str):
         """
 
     buttons_html = get_affiliate_buttons_block(item, amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url)
+    related_html = get_related_grid(item, db)
 
     return f"""<!DOCTYPE html>
 <html lang="it">
@@ -626,25 +693,25 @@ def generate_guide_page(item, brands_list, today_str):
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
-            <a href="/index.html" class="hover:text-slate-900">Catalogo</a>
+            <a href="/" class="hover:text-slate-900">Catalogo</a>
             <span>/</span>
             <a href="/marca/{brand_slug}.html" class="hover:text-emerald-700">{item['marca']}</a>
             <span>/</span>
             <a href="/modello/{item['id']}.html" class="hover:text-emerald-700">{item['modello']}</a>
             <span>/</span>
-            <span class="text-slate-900 font-semibold">Guida Sostituzione</span>
+            <span class="text-slate-900 font-semibold">Guida Manutenzione</span>
         </nav>
 
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden mb-8">
             <div class="bg-slate-900 px-6 py-7 text-white border-b border-slate-800">
                 <span class="inline-block bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold px-3 py-1 rounded-full mb-3">
-                    PROCEDURA TECNICA E RESET ERRORE
+                    PROCEDURA TECNICA E MANUTENZIONE
                 </span>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                    Sostituzione Batteria e Risoluzione Errori {item['marca']} {item['modello']}
+                    {"Sostituzione Filtri, Sacchetti e Ricambi" if wired else "Sostituzione Batteria e Risoluzione Errori"} {item['marca']} {item['modello']}
                 </h1>
                 <p class="text-slate-300 text-sm mt-2 leading-relaxed">
-                    Guida pratica per diagnosticare il calo di autonomia, verificare il codice OEM <span class="font-mono text-emerald-400 font-bold">{item['codice_oem_batteria']}</span> ed eseguire il cambio senza errori.
+                    Guida pratica per verificare il codice OEM <span class="font-mono text-emerald-400 font-bold">{item['codice_oem_batteria']}</span> ed eseguire il cambio senza errori.
                 </p>
             </div>
 
@@ -659,7 +726,7 @@ def generate_guide_page(item, brands_list, today_str):
                     </a>
                 </div>
 
-                <h2 class="text-lg font-extrabold text-slate-900 mb-4">Procedura Passo-Passo di Sostituzione</h2>
+                <h2 class="text-lg font-extrabold text-slate-900 mb-4">Procedura Passo-Passo</h2>
                 <div class="space-y-3.5 mb-8">
                     {steps_html}
                 </div>
@@ -673,10 +740,17 @@ def generate_guide_page(item, brands_list, today_str):
                 </div>
             </div>
         </div>
+
+        <div>
+            <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-500 mb-3">Altre Schede Verificate ({item['marca']})</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                {related_html}
+            </div>
+        </div>
     </main>
 
     {get_footer(brands_list)}
-    {get_mobile_sticky_bar(amz_batt_url, amz_kit_url)}
+    {get_mobile_sticky_bar(item, amz_batt_url, amz_kit_url)}
 </body>
 </html>"""
 
@@ -685,7 +759,7 @@ def generate_brand_page(brand_info, brand_items, brands_list, today_str):
     brand_name = brand_info["name"]
     brand_slug = brand_info["slug"]
     title = f"Batterie e Ricambi Compatibili {brand_name} - Catalogo OEM {today_str}"
-    desc = f"Elenco completo dei modelli {brand_name} verificati: codici batteria OEM, dimensioni vano e kit filtri/spazzole compatibili."
+    desc = f"Elenco completo dei modelli {brand_name} verificati: codici OEM, dimensioni vano e kit filtri/spazzole compatibili."
 
     cards_html = ""
     for item in brand_items:
@@ -725,11 +799,11 @@ def generate_brand_page(brand_info, brand_items, brands_list, today_str):
     <section class="bg-slate-950 text-white border-b border-slate-800 py-10 px-4 sm:px-6">
         <div class="max-w-5xl mx-auto">
             <nav class="text-xs text-slate-400 mb-3">
-                <a href="/index.html" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{brand_name}</span>
+                <a href="/" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{brand_name}</span>
             </nav>
             <h1 class="text-2xl sm:text-4xl font-extrabold text-white">Batterie e Ricambi Compatibili {brand_name}</h1>
             <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl">
-                Seleziona il tuo modello {brand_name} tra i {len(brand_items)} dispositivi verificati per visualizzare codice OEM della batteria e kit consumabili.
+                Seleziona il tuo modello {brand_name} tra i {len(brand_items)} dispositivi verificati per visualizzare codice OEM e kit consumabili.
             </p>
         </div>
     </section>
@@ -759,7 +833,7 @@ def generate_category_page(cat_slug, cat_meta, cat_items, brands_list, today_str
                     <span class="text-[11px] text-slate-400">{item['fascia_prezzo_ricambio']}</span>
                 </div>
                 <h2 class="text-base font-extrabold text-slate-900 mt-2.5">{item['modello']}</h2>
-                <p class="text-xs font-mono text-slate-600 mt-1.5">OEM: <strong>{item['codice_oem_batteria'].split('/')[0].strip()}</strong></p>
+                <p class="text-xs font-mono text-slate-600 mt-1.5">OEM: <strong>{clean_search_term(item['codice_oem_batteria'])}</strong></p>
                 <p class="text-xs text-slate-500 mt-1">{item['specifiche_batteria']}</p>
             </div>
             <div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -790,7 +864,7 @@ def generate_category_page(cat_slug, cat_meta, cat_items, brands_list, today_str
     <section class="bg-slate-950 text-white border-b border-slate-800 py-10 px-4 sm:px-6">
         <div class="max-w-5xl mx-auto">
             <nav class="text-xs text-slate-400 mb-3">
-                <a href="/index.html" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{cat_meta['short']}</span>
+                <a href="/" class="hover:text-white">Catalogo Generale</a> / <span class="text-emerald-400 font-semibold">{cat_meta['short']}</span>
             </nav>
             <h1 class="text-2xl sm:text-4xl font-extrabold text-white">{cat_meta['name']}</h1>
             <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl">
@@ -827,7 +901,7 @@ def generate_index_page(db, brands_list, today_str):
             <div class="mt-4 pt-3.5 border-t border-slate-100">
                 <div class="flex items-center justify-between text-xs mb-2">
                     <span class="text-slate-400 font-medium">Cod. OEM:</span>
-                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{item['codice_oem_batteria'].split('/')[0].strip()}</span>
+                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{clean_search_term(item['codice_oem_batteria'])}</span>
                 </div>
                 <div class="flex items-center justify-between text-xs font-bold text-emerald-600 group-hover:text-emerald-700">
                     <span>Verifica compatibilità</span>
@@ -843,7 +917,7 @@ def generate_index_page(db, brands_list, today_str):
     head_html = get_head_assets(
         f"{NOME_PORTALE} - Database Compatibilità Batterie e Ricambi OEM ({today_str})",
         "Verifica subito codice batteria OEM, voltaggio, dimensioni e kit ricambi compatibili per robot aspirapolvere, tagliaerba e scope senza fili.",
-        f"{DOMINIO_SITO}/index.html",
+        f"{DOMINIO_SITO}/",
         extra_head
     )
 
@@ -940,7 +1014,6 @@ def generate_index_page(db, brands_list, today_str):
 
 
 def ping_indexnow(url_list):
-    """Notifica immediatamente Bing, DuckDuckGo, Yahoo ed Ecosia delle nuove pagine."""
     host = DOMINIO_SITO.replace("https://", "").replace("http://", "").strip("/")
     payload = {
         "host": host,
@@ -1012,7 +1085,7 @@ def main():
         with open(os.path.join(OUTPUT_DIR, "modello", f"{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(page_html)
 
-        guide_html = generate_guide_page(item, brands_list, today_str)
+        guide_html = generate_guide_page(item, db, brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "guida", f"sostituzione-batteria-{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(guide_html)
 
@@ -1034,8 +1107,8 @@ def main():
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as out:
         out.write(index_html)
 
-    all_urls = [f"{DOMINIO_SITO}/index.html"]
-    urls_xml = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
+    all_urls = [f"{DOMINIO_SITO}/"]
+    urls_xml = [f"<url><loc>{DOMINIO_SITO}/</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
     rss_items = []
 
     for c_slug in CATEGORIES_META.keys():
@@ -1055,7 +1128,7 @@ def main():
         urls_xml.append(f"<url><loc>{page_url}</loc><lastmod>{today_iso}</lastmod><priority>0.8</priority></url>")
         urls_xml.append(f"<url><loc>{guide_url}</loc><lastmod>{today_iso}</lastmod><priority>0.75</priority></url>")
 
-        safe_title = html.escape(f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']})")
+        safe_title = html.escape(f"Ricambi e Batteria {item['marca']} {item['modello']} ({item['codice_oem_batteria']})")
         safe_desc = html.escape(f"Specifiche verificate: {item['specifiche_batteria']}, misure {item['dimensioni_mm']}. Consumabili: {item['consumabili_inclusi']}.")
         rss_items.append(f"<item><title>{safe_title}</title><link>{page_url}</link><guid>{page_url}</guid><pubDate>{rss_date}</pubDate><description>{safe_desc}</description></item>")
 
@@ -1070,7 +1143,7 @@ def main():
 <rss version="2.0">
 <channel>
 <title>{html.escape(NOME_PORTALE)}</title>
-<link>{DOMINIO_SITO}</link>
+<link>{DOMINIO_SITO}/</link>
 <description>Aggiornamenti tecnici e compatibilità ricambi robot e aspirapolvere.</description>
 {"".join(rss_items)}
 </channel>
