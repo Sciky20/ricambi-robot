@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import urllib.parse
@@ -11,6 +12,7 @@ NOME_PORTALE = "RicambiRobot Check Italia"
 DOMINIO_SITO = "https://ricambi-robot.pages.dev"  # Cambialo quando colleghi il tuo dominio
 AMAZON_TAG = "ricambirobot-21"                   # Il tuo ID Tracciamento Amazon Associates
 EBAY_CAMPID = "5339253914"                       # Il tuo Campaign ID di eBay Partner Network
+INDEXNOW_KEY = "8f4e2a9c1b7d40369e5a1c8b2d7f4e90"  # Chiave automatica per ping immediato a Bing/DuckDuckGo/Yahoo
 MAX_AI_CALLS_PER_RUN = 15                        # Quante nuove schede arricchire con AI a ogni avvio
 OUTPUT_DIR = "public"
 DB_FILE = "database.json"
@@ -96,10 +98,28 @@ def build_affiliate_links(item):
     return amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url
 
 
-def generate_model_page(item, today_str):
+def generate_model_page(item, db, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
     title = f"Batteria e Ricambi Compatibili {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Tabella {today_str}"
     desc = f"Tabella di compatibilità verificata per {item['marca']} {item['modello']}: codice batteria {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e migliori offerte."
+    oem_safe = item["codice_oem_batteria"].replace("'", "")
+
+    # Collegamenti interni automatici per accelerare la scansione di Google
+    related = [x for x in db if x["marca"].lower() == item["marca"].lower() and x["id"] != item["id"]]
+    if len(related) < 4:
+        same_cat = [x for x in db if x["categoria"] == item["categoria"] and x["id"] != item["id"] and x not in related]
+        related.extend(same_cat[:4 - len(related)])
+    related = related[:4]
+
+    related_html = ""
+    for rel in related:
+        related_html += f"""
+        <a href="/modello/{rel['id']}.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase">{rel['categoria']}</span>
+            <p class="font-bold text-slate-900 text-sm mt-1">{rel['marca']} {rel['modello']}</p>
+            <p class="text-xs font-mono text-slate-500 mt-1">Cod: {rel['codice_oem_batteria']}</p>
+        </a>
+        """
 
     faq_schema_items = []
     faq_html_items = ""
@@ -122,7 +142,7 @@ def generate_model_page(item, today_str):
         "mainEntity": faq_schema_items
     }, ensure_ascii=False)
 
-    html = f"""<!DOCTYPE html>
+    page_html = f"""<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -151,9 +171,26 @@ def generate_model_page(item, today_str):
             <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
                 Batteria e Kit Ricambi per {item['marca']} {item['modello']}
             </h1>
-            <p class="text-slate-600 mb-6">
+            <p class="text-slate-600 mb-5">
                 Specifiche tecniche ufficiali, codici OEM equivalenti e link diretti ai ricambi compatibili al 100% per il tuo {item['categoria'].lower()}.
             </p>
+
+            <!-- Selettore interattivo del problema -->
+            <div class="bg-slate-900 text-white rounded-xl p-4 mb-6">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2.5">Diagnosi Rapida: qual è il problema del tuo {item['marca']}?</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onclick="evidenziaRicambio('batteria')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#9889; Dura poco / Non carica
+                    </button>
+                    <button type="button" onclick="evidenziaRicambio('kit')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#128295; Aspira poco / Usura
+                    </button>
+                    <button type="button" onclick="evidenziaRicambio('entrambi')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#9989; Manutenzione completa
+                    </button>
+                </div>
+                <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-2.5 border-t border-slate-800"></p>
+            </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden">
@@ -186,9 +223,19 @@ def generate_model_page(item, today_str):
                 </table>
             </div>
 
-            <div class="space-y-4 mt-8">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">1. Batteria di Ricambio Compatibile</p>
+            <!-- Checklist anti-errore prima del clic -->
+            <div class="mt-6 bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">Checklist Anti-Errore Prima dell'Acquisto</p>
+                <ul class="text-xs text-slate-700 space-y-1.5">
+                    <li>&#10004; <strong>Voltaggio e sigla verificati:</strong> {item['specifiche_batteria']} (Cod. {item['codice_oem_batteria']}).</li>
+                    <li>&#10004; <strong>Ingombro esatto:</strong> {item['dimensioni_mm']} compatibile con l'alloggiamento originale.</li>
+                    <li>&#10004; <strong>Acquisto protetto:</strong> reso gratuito entro 30 giorni garantito su Amazon e eBay in caso di errato ordine.</li>
+                </ul>
+            </div>
+
+            <div class="space-y-4 mt-6">
+                <div id="box-batteria" class="p-3.5 rounded-xl border border-slate-200 transition-all">
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">1. Batteria di Ricambio Compatibile ({item['codice_oem_batteria']})</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
                             Cerca Batteria su Amazon.it &rarr;
@@ -198,8 +245,8 @@ def generate_model_page(item, today_str):
                         </a>
                     </div>
                 </div>
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
+                <div id="box-kit" class="p-3.5 rounded-xl border border-slate-200 transition-all">
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
                             Kit Ricambi su Amazon.it &rarr;
@@ -210,9 +257,6 @@ def generate_model_page(item, today_str):
                     </div>
                 </div>
             </div>
-            <p class="text-xs text-slate-400 mt-3 text-center">
-                *Controlla sempre che il codice {item['codice_oem_batteria']} o la sigla {item['modello']} siano riportati nella descrizione del venditore prima di confermare l'ordine.
-            </p>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
@@ -220,9 +264,16 @@ def generate_model_page(item, today_str):
             <p class="text-slate-700 leading-relaxed">{item['nota_tecnica_ai']}</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
             <h2 class="text-xl font-bold text-slate-900 mb-4">Domande Frequenti ({item['marca']} {item['modello']})</h2>
             {faq_html_items}
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-bold text-slate-900 mb-3">Altre Schede Tecniche Correlate ({item['marca']})</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {related_html}
+            </div>
         </div>
     </main>
 
@@ -232,9 +283,31 @@ def generate_model_page(item, today_str):
             <p>In qualità di Affiliato Amazon e partner eBay Partner Network, questo portale riceve una commissione sugli acquisti idonei effettuati tramite i link presenti, senza alcun sovrapprezzo per l'utente.</p>
         </div>
     </footer>
+
+    <script>
+    function evidenziaRicambio(tipo) {{
+        const boxBatt = document.getElementById('box-batteria');
+        const boxKit = document.getElementById('box-kit');
+        const msg = document.getElementById('diagnosi-msg');
+        boxBatt.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+        boxKit.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+        if (tipo === 'batteria') {{
+            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: sostituisci la batteria verificando il codice {oem_safe}.';
+        }} else if (tipo === 'kit') {{
+            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: rinnova filtri, spazzole o lame per ripristinare la resa originale.';
+        }} else {{
+            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: revisione completa con batteria nuova ({oem_safe}) e kit consumabili.';
+        }}
+        msg.classList.remove('hidden');
+    }}
+    </script>
 </body>
 </html>"""
-    return html
+    return page_html
 
 
 def generate_index_page(db, today_str):
@@ -258,6 +331,7 @@ def generate_index_page(db, today_str):
     <meta name="google-site-verification" content="pBkbOhlZXa5p-vR2Xff77ujhx4NbinX1HerB6K08qRw" />
     <title>{NOME_PORTALE} - Database Compatibilità Batterie e Ricambi Robot</title>
     <meta name="description" content="Trova subito il codice batteria OEM, le misure esatte e i kit ricambi compatibili per il tuo robot aspirapolvere o tagliaerba.">
+    <link rel="alternate" type="application/rss+xml" title="{NOME_PORTALE} RSS Feed" href="{DOMINIO_SITO}/feed.xml">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -289,10 +363,27 @@ def generate_index_page(db, today_str):
 </html>"""
 
 
+def ping_indexnow(url_list):
+    """Notifica immediatamente Bing, DuckDuckGo, Yahoo ed Ecosia delle nuove pagine."""
+    host = DOMINIO_SITO.replace("https://", "").replace("http://", "").strip("/")
+    payload = {
+        "host": host,
+        "key": INDEXNOW_KEY,
+        "keyLocation": f"{DOMINIO_SITO}/{INDEXNOW_KEY}.txt",
+        "urlList": url_list
+    }
+    try:
+        res = requests.post("https://api.indexnow.org/indexnow", json=payload, timeout=15)
+        print(f"[IndexNow] Ping inviato per {len(url_list)} URL -> HTTP {res.status_code}")
+    except Exception as e:
+        print(f"[IndexNow] Avviso invio: {e}")
+
+
 def main():
     os.makedirs(os.path.join(OUTPUT_DIR, "modello"), exist_ok=True)
     today_str = datetime.now().strftime("%d/%m/%Y")
     today_iso = datetime.now().strftime("%Y-%m-%d")
+    rss_date = datetime.now().strftime("%a, %d %b %Y 03:00:00 +0000")
 
     with open(DB_FILE, "r", encoding="utf-8") as f:
         db = json.load(f)
@@ -318,7 +409,7 @@ def main():
             item["nota_tecnica_ai"] = fb["nota_tecnica"]
             item["faq_ai"] = fb["faq"]
 
-        page_html = generate_model_page(item, today_str)
+        page_html = generate_model_page(item, db, today_str)
         with open(os.path.join(OUTPUT_DIR, "modello", f"{item['id']}.html"), "w", encoding="utf-8") as out:
             out.write(page_html)
 
@@ -331,24 +422,51 @@ def main():
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as out:
         out.write(index_html)
 
-    # Genera Sitemap.xml per Google Search Console
-    urls = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
+    # Genera Sitemap.xml e lista URL
+    all_urls = [f"{DOMINIO_SITO}/index.html"]
+    urls_xml = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
+    rss_items = []
+
     for item in db:
-        urls.append(f"<url><loc>{DOMINIO_SITO}/modello/{item['id']}.html</loc><lastmod>{today_iso}</lastmod><priority>0.8</priority></url>")
-    
+        page_url = f"{DOMINIO_SITO}/modello/{item['id']}.html"
+        all_urls.append(page_url)
+        urls_xml.append(f"<url><loc>{page_url}</loc><lastmod>{today_iso}</lastmod><priority>0.8</priority></url>")
+        safe_title = html.escape(f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']})")
+        safe_desc = html.escape(f"Specifiche verificate: {item['specifiche_batteria']}, misure {item['dimensioni_mm']}. Consumabili: {item['consumabili_inclusi']}.")
+        rss_items.append(f"<item><title>{safe_title}</title><link>{page_url}</link><guid>{page_url}</guid><pubDate>{rss_date}</pubDate><description>{safe_desc}</description></item>")
+
     sitemap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-{"".join(urls)}
+{"".join(urls_xml)}
 </urlset>"""
     with open(os.path.join(OUTPUT_DIR, "sitemap.xml"), "w", encoding="utf-8") as out:
         out.write(sitemap_xml)
 
-    # Genera robots.txt
+    # Genera Feed RSS automatico (feed.xml)
+    feed_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>{html.escape(NOME_PORTALE)}</title>
+<link>{DOMINIO_SITO}</link>
+<description>Aggiornamenti tecnici e compatibilità ricambi robot e aspirapolvere.</description>
+{"".join(rss_items)}
+</channel>
+</rss>"""
+    with open(os.path.join(OUTPUT_DIR, "feed.xml"), "w", encoding="utf-8") as out:
+        out.write(feed_xml)
+
+    # Genera robots.txt e file chiave IndexNow
     robots_txt = f"User-agent: *\nAllow: /\nSitemap: {DOMINIO_SITO}/sitemap.xml\n"
     with open(os.path.join(OUTPUT_DIR, "robots.txt"), "w", encoding="utf-8") as out:
         out.write(robots_txt)
 
-    print(f"Portale generato con successo: {len(db)} pagine create in /{OUTPUT_DIR}.")
+    with open(os.path.join(OUTPUT_DIR, f"{INDEXNOW_KEY}.txt"), "w", encoding="utf-8") as out:
+        out.write(INDEXNOW_KEY)
+
+    # Ping automatico ai motori di ricerca
+    ping_indexnow(all_urls)
+
+    print(f"Portale generato con successo: {len(db)} pagine, feed.xml e IndexNow completati.")
 
 
 if __name__ == "__main__":
