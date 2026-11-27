@@ -8,12 +8,12 @@ import requests
 # ==========================================
 # CONFIGURAZIONE CEO (Modifica solo qui)
 # ==========================================
-NOME_PORTALE = "RicambiRobot Check Italia"
-DOMINIO_SITO = "https://ricambi-robot.pages.dev"  # Cambialo quando colleghi il tuo dominio
-AMAZON_TAG = "ricambirobot-21"                   # Il tuo ID Tracciamento Amazon Associates
-EBAY_CAMPID = "5339253914"                       # Il tuo Campaign ID di eBay Partner Network
-INDEXNOW_KEY = "8f4e2a9c1b7d40369e5a1c8b2d7f4e90"  # Chiave automatica per ping immediato a Bing/DuckDuckGo/Yahoo
-MAX_AI_CALLS_PER_RUN = 15                        # Quante nuove schede arricchire con AI a ogni avvio
+NOME_PORTALE = "RicambiRobot Check"
+DOMINIO_SITO = "https://ricambi-robot.pages.dev"
+AMAZON_TAG = "ricambirobot-21"
+EBAY_CAMPID = "5339253914"
+INDEXNOW_KEY = "8f4e2a9c1b7d40369e5a1c8b2d7f4e90"
+MAX_AI_CALLS_PER_RUN = 15
 OUTPUT_DIR = "public"
 DB_FILE = "database.json"
 
@@ -30,7 +30,7 @@ def call_gemini_ai(item):
     Sei un tecnico specializzato in ricambi elettronici. Scrivi in italiano per il modello {item['marca']} {item['modello']} ({item['categoria']}).
     Dati tecnici noti: Codice batteria OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
     
-    Restituisci ESCLUSAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
+    Restituisci ESCLUSIVAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
     {{
       "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la polarita del connettore, quando sostituire la batteria e come evitare errori di montaggio.",
       "faq": [
@@ -98,13 +98,89 @@ def build_affiliate_links(item):
     return amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url
 
 
+def get_head_assets(title, desc, canonical_url, extra_head=""):
+    return f"""<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <meta name="description" content="{desc}">
+    <link rel="canonical" href="{canonical_url}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {{
+            theme: {{
+                extend: {{
+                    fontFamily: {{
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }}
+                }}
+            }}
+        }}
+    </script>
+    {extra_head}"""
+
+
+def get_navbar(today_str):
+    return f"""<header class="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
+            <a href="/index.html" class="flex items-center gap-2.5 group">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <svg class="w-5 h-5 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                    </svg>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg tracking-tight text-white block leading-none">{NOME_PORTALE}</span>
+                    <span class="text-[10px] font-medium uppercase tracking-widest text-emerald-400">Database Tecnico OEM</span>
+                </div>
+            </a>
+            <div class="flex items-center gap-3">
+                <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Listino verificado: {today_str}
+                </span>
+                <a href="/index.html" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
+                    Catalogo
+                </a>
+            </div>
+        </div>
+    </header>"""
+
+
+def get_footer():
+    return f"""<footer class="bg-slate-950 text-slate-400 border-t border-slate-800 mt-16">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-800/80 text-xs leading-relaxed">
+                <div>
+                    <p class="text-white font-bold text-sm mb-2">{NOME_PORTALE} Italia</p>
+                    <p class="text-slate-400">Archivio indipendente di specifiche elettriche, ingombri e codici ricambio OEM per robot aspirapolvere, tagliaerba automatici e scope elettriche senza fili.</p>
+                </div>
+                <div>
+                    <p class="text-white font-bold text-sm mb-2">Metodologia di Verifica</p>
+                    <p class="text-slate-400">I parametri di tensione (Volt), capacità (mAh) e compatibilità meccanica sono incrociati con i manuali di servizio ufficiali per prevenire danni alle schede BMS.</p>
+                </div>
+                <div>
+                    <p class="text-white font-bold text-sm mb-2">Trasparenza Commerciale</p>
+                    <p class="text-slate-400">In qualità di Affiliato Amazon e partner eBay Partner Network, il portale riceve una commissione sugli acquisti idonei senza alcun costo aggiuntivo per l'acquirente.</p>
+                </div>
+            </div>
+            <div class="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
+                <p>&copy; {datetime.now().year} {NOME_PORTALE} — Tutti i marchi citati appartengono ai rispettivi proprietari.</p>
+                <a href="/index.html" class="text-emerald-400 hover:text-emerald-300 font-medium">Torna all'indice dei modelli &uarr;</a>
+            </div>
+        </div>
+    </footer>"""
+
+
 def generate_model_page(item, db, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item)
-    title = f"Batteria e Ricambi Compatibili {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Tabella {today_str}"
-    desc = f"Tabella di compatibilità verificata per {item['marca']} {item['modello']}: codice batteria {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e migliori offerte."
+    title = f"Batteria e Ricambi {item['marca']} {item['modello']} ({item['codice_oem_batteria']}) - Scheda {today_str}"
+    desc = f"Compatibilità verificata {item['marca']} {item['modello']}: codice batteria OEM {item['codice_oem_batteria']}, misure {item['dimensioni_mm']}, kit filtri e confronto prezzi."
     oem_safe = item["codice_oem_batteria"].replace("'", "")
 
-    # Collegamenti interni automatici per accelerare la scansione di Google
     related = [x for x in db if x["marca"].lower() == item["marca"].lower() and x["id"] != item["id"]]
     if len(related) < 4:
         same_cat = [x for x in db if x["categoria"] == item["categoria"] and x["id"] != item["id"] and x not in related]
@@ -114,10 +190,10 @@ def generate_model_page(item, db, today_str):
     related_html = ""
     for rel in related:
         related_html += f"""
-        <a href="/modello/{rel['id']}.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
-            <span class="text-[11px] font-semibold text-emerald-700 uppercase">{rel['categoria']}</span>
-            <p class="font-bold text-slate-900 text-sm mt-1">{rel['marca']} {rel['modello']}</p>
-            <p class="text-xs font-mono text-slate-500 mt-1">Cod: {rel['codice_oem_batteria']}</p>
+        <a href="/modello/{rel['id']}.html" class="group block p-4 rounded-xl border border-slate-200/90 hover:border-emerald-500 bg-white hover:shadow-md transition-all">
+            <span class="text-[10px] font-bold tracking-wider uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{rel['marca']}</span>
+            <p class="font-bold text-slate-900 text-sm mt-2 group-hover:text-emerald-700 transition">{rel['modello']}</p>
+            <p class="text-xs font-mono text-slate-500 mt-1.5 truncate">OEM: {rel['codice_oem_batteria']}</p>
         </a>
         """
 
@@ -130,9 +206,12 @@ def generate_model_page(item, db, today_str):
             "acceptedAnswer": {"@type": "Answer", "text": f["a"]}
         })
         faq_html_items += f"""
-        <div class="border-b border-slate-200 py-4">
-            <h3 class="font-semibold text-slate-900 text-lg">{f['q']}</h3>
-            <p class="text-slate-600 mt-1">{f['a']}</p>
+        <div class="p-5 rounded-xl bg-slate-50 border border-slate-200/80">
+            <h3 class="font-bold text-slate-900 text-base flex items-start gap-2.5">
+                <span class="text-emerald-600 font-mono text-sm mt-0.5">Q.</span>
+                <span>{f['q']}</span>
+            </h3>
+            <p class="text-slate-600 text-sm mt-2 pl-6 leading-relaxed">{f['a']}</p>
         </div>
         """
 
@@ -142,165 +221,222 @@ def generate_model_page(item, db, today_str):
         "mainEntity": faq_schema_items
     }, ensure_ascii=False)
 
+    head_html = get_head_assets(
+        title,
+        desc,
+        f"{DOMINIO_SITO}/modello/{item['id']}.html",
+        f'<script type="application/ld+json">{schema_json}</script>'
+    )
+
     page_html = f"""<!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <meta name="description" content="{desc}">
-    <link rel="canonical" href="{DOMINIO_SITO}/modello/{item['id']}.html">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="application/ld+json">{schema_json}</script>
+    {head_html}
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
-    <header class="bg-slate-900 text-white py-4 px-6 shadow">
-        <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <a href="/index.html" class="font-bold text-xl tracking-tight text-emerald-400">{NOME_PORTALE}</a>
-            <span class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-300">Dati verificati: {today_str}</span>
-        </div>
-    </header>
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased selection:bg-emerald-200 selection:text-slate-900">
+    {get_navbar(today_str)}
 
-    <main class="max-w-4xl mx-auto px-4 py-8">
-        <nav class="text-sm text-slate-500 mb-4">
-            <a href="/index.html" class="hover:underline">Home Catalogo</a> &rarr; <span>{item['categoria']}</span> &rarr; <span class="text-slate-900 font-medium">{item['marca']} {item['modello']}</span>
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <!-- Breadcrumb -->
+        <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
+            <a href="/index.html" class="hover:text-slate-900 transition">Catalogo</a>
+            <span>/</span>
+            <span>{item['categoria']}</span>
+            <span>/</span>
+            <span class="text-slate-900 font-semibold">{item['marca']} {item['modello']}</span>
         </nav>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-1 rounded mb-2">SCHEDA DI COMPATIBILITÀ VERIFICATA</span>
-            <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
-                Batteria e Kit Ricambi per {item['marca']} {item['modello']}
-            </h1>
-            <p class="text-slate-600 mb-5">
-                Specifiche tecniche ufficiali, codici OEM equivalenti e link diretti ai ricambi compatibili al 100% per il tuo {item['categoria'].lower()}.
-            </p>
-
-            <!-- Selettore interattivo del problema -->
-            <div class="bg-slate-900 text-white rounded-xl p-4 mb-6">
-                <p class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2.5">Diagnosi Rapida: qual è il problema del tuo {item['marca']}?</p>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <button type="button" onclick="evidenziaRicambio('batteria')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
-                        &#9889; Dura poco / Non carica
-                    </button>
-                    <button type="button" onclick="evidenziaRicambio('kit')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
-                        &#128295; Aspira poco / Usura
-                    </button>
-                    <button type="button" onclick="evidenziaRicambio('entrambi')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
-                        &#9989; Manutenzione completa
-                    </button>
+        <!-- Card Principale -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden mb-8">
+            <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 px-6 py-7 text-white border-b border-slate-800">
+                <div class="flex flex-wrap items-center gap-2 mb-3">
+                    <span class="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold px-3 py-1 rounded-full">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        COMPATIBILITÀ VERIFICATA
+                    </span>
+                    <span class="text-xs font-medium text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-full">{item['categoria']}</span>
                 </div>
-                <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-2.5 border-t border-slate-800"></p>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                    Batteria e Ricambi {item['marca']} {item['modello']}
+                </h1>
+                <p class="text-slate-300 text-sm mt-2 max-w-2xl leading-relaxed">
+                    Scheda tecnica di riferimento con codice OEM della batteria, dimensioni esatte del vano e kit consumabili compatibili.
+                </p>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden">
-                    <tbody>
-                        <tr class="bg-slate-100 border-b border-slate-200">
-                            <th class="py-3 px-4 font-semibold text-slate-700 w-1/3">Modello Dispositivo</th>
-                            <td class="py-3 px-4 font-bold text-slate-900">{item['marca']} {item['modello']}</td>
-                        </tr>
-                        <tr class="border-b border-slate-200">
-                            <th class="py-3 px-4 font-semibold text-slate-700">Codice OEM Batteria</th>
-                            <td class="py-3 px-4 font-mono text-emerald-700 font-bold">{item['codice_oem_batteria']}</td>
-                        </tr>
-                        <tr class="bg-slate-50 border-b border-slate-200">
-                            <th class="py-3 px-4 font-semibold text-slate-700">Voltaggio e Capacità</th>
-                            <td class="py-3 px-4">{item['specifiche_batteria']}</td>
-                        </tr>
-                        <tr class="border-b border-slate-200">
-                            <th class="py-3 px-4 font-semibold text-slate-700">Dimensioni Vano Batteria</th>
-                            <td class="py-3 px-4">{item['dimensioni_mm']}</td>
-                        </tr>
-                        <tr class="bg-slate-50 border-b border-slate-200">
-                            <th class="py-3 px-4 font-semibold text-slate-700">Kit Consumabili Compatibili</th>
-                            <td class="py-3 px-4">{item['consumabili_inclusi']}</td>
-                        </tr>
-                        <tr>
-                            <th class="py-3 px-4 font-semibold text-slate-700">Fascia Prezzo di Mercato</th>
-                            <td class="py-3 px-4 font-semibold text-slate-900">{item['fascia_prezzo_ricambio']}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Checklist anti-errore prima del clic -->
-            <div class="mt-6 bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
-                <p class="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">Checklist Anti-Errore Prima dell'Acquisto</p>
-                <ul class="text-xs text-slate-700 space-y-1.5">
-                    <li>&#10004; <strong>Voltaggio e sigla verificati:</strong> {item['specifiche_batteria']} (Cod. {item['codice_oem_batteria']}).</li>
-                    <li>&#10004; <strong>Ingombro esatto:</strong> {item['dimensioni_mm']} compatibile con l'alloggiamento originale.</li>
-                    <li>&#10004; <strong>Acquisto protetto:</strong> reso gratuito entro 30 giorni garantito su Amazon e eBay in caso di errato ordine.</li>
-                </ul>
-            </div>
-
-            <div class="space-y-4 mt-6">
-                <div id="box-batteria" class="p-3.5 rounded-xl border border-slate-200 transition-all">
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">1. Batteria di Ricambio Compatibile ({item['codice_oem_batteria']})</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
-                            Cerca Batteria su Amazon.it &rarr;
-                        </a>
-                        <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
-                            Cerca Batteria su eBay.it &rarr;
-                        </a>
+            <div class="p-6 sm:p-8">
+                <!-- 4 KPI Tecnici a colpo d'occhio -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-7">
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Codice OEM</p>
+                        <p class="font-mono text-sm font-bold text-emerald-700 mt-1 break-words">{item['codice_oem_batteria']}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Specifiche Elettriche</p>
+                        <p class="text-xs font-bold text-slate-900 mt-1 leading-snug">{item['specifiche_batteria']}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ingombro Vano</p>
+                        <p class="font-mono text-xs font-bold text-slate-900 mt-1">{item['dimensioni_mm']}</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Prezzo Medio Stimato</p>
+                        <p class="text-sm font-extrabold text-slate-900 mt-1">{item['fascia_prezzo_ricambio']}</p>
                     </div>
                 </div>
-                <div id="box-kit" class="p-3.5 rounded-xl border border-slate-200 transition-all">
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
-                            Kit Ricambi su Amazon.it &rarr;
-                        </a>
-                        <a href="{eby_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
-                            Kit Ricambi su eBay.it &rarr;
-                        </a>
+
+                <!-- Selettore interattivo del problema -->
+                <div class="bg-slate-900 text-white rounded-xl p-5 mb-7 shadow-inner">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-xs font-bold uppercase tracking-wider text-emerald-400">Selettore Rapido Ricambio</p>
+                        <span class="text-[11px] text-slate-400">Seleziona il sintomo</span>
                     </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <button type="button" onclick="evidenziaRicambio('batteria')" class="flex items-center gap-2 text-left text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 px-3.5 py-3 rounded-lg border border-slate-700 transition">
+                            <span class="text-amber-400">&#9889;</span>
+                            <span>Autonomia ridotta / Non carica</span>
+                        </button>
+                        <button type="button" onclick="evidenziaRicambio('kit')" class="flex items-center gap-2 text-left text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 px-3.5 py-3 rounded-lg border border-slate-700 transition">
+                            <span class="text-sky-400">&#128295;</span>
+                            <span>Perdita potenza / Usura parti</span>
+                        </button>
+                        <button type="button" onclick="evidenziaRicambio('entrambi')" class="flex items-center gap-2 text-left text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 px-3.5 py-3 rounded-lg border border-slate-700 transition">
+                            <span class="text-emerald-400">&#10004;</span>
+                            <span>Manutenzione completa</span>
+                        </button>
+                    </div>
+                    <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-3 border-t border-slate-800"></p>
+                </div>
+
+                <!-- Area Bottoni Acquisto -->
+                <div class="space-y-4 mb-7">
+                    <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
+                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile ({item['codice_oem_batteria']})</h2>
+                            </div>
+                            <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <a href="{amz_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                                <span>Verifica su Amazon.it</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                            </a>
+                            <a href="{eby_batt_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                                <span>Confronta su eBay.it</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div id="box-kit" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Manutenzione Periodica</span>
+                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Kit Consumabili ({item['consumabili_inclusi'].split(',')[0]})</h2>
+                            </div>
+                            <span class="text-xs font-medium text-slate-500">Spedizione rapida</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <a href="{amz_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                                <span>Kit Ricambi su Amazon.it</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                            </a>
+                            <a href="{eby_kit_url}" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                                <span>Kit Ricambi su eBay.it</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabella Dettagliata -->
+                <div class="border border-slate-200 rounded-xl overflow-hidden">
+                    <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Specifiche Tecniche Complete</h3>
+                    </div>
+                    <table class="w-full text-left text-sm border-collapse">
+                        <tbody class="divide-y divide-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 font-semibold text-slate-600 w-1/3 bg-slate-50/50">Dispositivo</th>
+                                <td class="py-3 px-4 font-bold text-slate-900">{item['marca']} {item['modello']}</td>
+                            </tr>
+                            <tr>
+                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Codici OEM Equivalenti</th>
+                                <td class="py-3 px-4 font-mono text-emerald-700 font-bold">{item['codice_oem_batteria']}</td>
+                            </tr>
+                            <tr>
+                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Tensione e Capacità</th>
+                                <td class="py-3 px-4 text-slate-800">{item['specifiche_batteria']}</td>
+                            </tr>
+                            <tr>
+                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Dimensioni Alloggiamento</th>
+                                <td class="py-3 px-4 font-mono text-slate-800">{item['dimensioni_mm']}</td>
+                            </tr>
+                            <tr>
+                                <th class="py-3 px-4 font-semibold text-slate-600 bg-slate-50/50">Consumabili Compatibili</th>
+                                <td class="py-3 px-4 text-slate-800">{item['consumabili_inclusi']}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-xl font-bold text-slate-900 mb-3">Note Tecniche di Montaggio e Manutenzione</h2>
-            <p class="text-slate-700 leading-relaxed">{item['nota_tecnica_ai']}</p>
+        <!-- Note Tecniche -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
+            <div class="flex items-center gap-2.5 mb-3">
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                </div>
+                <h2 class="text-lg font-extrabold text-slate-900">Note Tecniche di Installazione e Sicurezza</h2>
+            </div>
+            <p class="text-slate-600 text-sm sm:text-base leading-relaxed">{item['nota_tecnica_ai']}</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-xl font-bold text-slate-900 mb-4">Domande Frequenti ({item['marca']} {item['modello']})</h2>
-            {faq_html_items}
+        <!-- FAQ -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
+            <h2 class="text-lg font-extrabold text-slate-900 mb-4">Domande Frequenti su {item['marca']} {item['modello']}</h2>
+            <div class="space-y-3">
+                {faq_html_items}
+            </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 class="text-lg font-bold text-slate-900 mb-3">Altre Schede Tecniche Correlate ({item['marca']})</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <!-- Correlati -->
+        <div>
+            <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-500 mb-3">Altre Schede Verificate ({item['marca']})</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
                 {related_html}
             </div>
         </div>
     </main>
 
-    <footer class="bg-slate-900 text-slate-400 text-xs py-8 px-4 mt-12">
-        <div class="max-w-4xl mx-auto text-center space-y-2">
-            <p>&copy; {datetime.now().year} {NOME_PORTALE} - Database Tecnico Indipendente.</p>
-            <p>In qualità di Affiliato Amazon e partner eBay Partner Network, questo portale riceve una commissione sugli acquisti idonei effettuati tramite i link presenti, senza alcun sovrapprezzo per l'utente.</p>
-        </div>
-    </footer>
+    {get_footer()}
 
     <script>
     function evidenziaRicambio(tipo) {{
         const boxBatt = document.getElementById('box-batteria');
         const boxKit = document.getElementById('box-kit');
         const msg = document.getElementById('diagnosi-msg');
-        boxBatt.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
-        boxKit.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+        boxBatt.classList.remove('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+        boxKit.classList.remove('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+        boxBatt.classList.add('border-slate-200');
+        boxKit.classList.add('border-slate-200');
         if (tipo === 'batteria') {{
-            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
-            msg.textContent = 'Consiglio tecnico: sostituisci la batteria verificando il codice {oem_safe}.';
+            boxBatt.classList.remove('border-slate-200');
+            boxBatt.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+            msg.textContent = 'Ricambio consigliato: batteria compatibile con codice OEM {oem_safe}.';
         }} else if (tipo === 'kit') {{
-            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
-            msg.textContent = 'Consiglio tecnico: rinnova filtri, spazzole o lame per ripristinare la resa originale.';
+            boxKit.classList.remove('border-slate-200');
+            boxKit.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+            msg.textContent = 'Ricambio consigliato: kit filtri, spazzole o lame per ripristinare la capacità di raccolta.';
         }} else {{
-            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
-            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
-            msg.textContent = 'Consiglio tecnico: revisione completa con batteria nuova ({oem_safe}) e kit consumabili.';
+            boxBatt.classList.remove('border-slate-200');
+            boxKit.classList.remove('border-slate-200');
+            boxBatt.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+            boxKit.classList.add('border-emerald-500', 'bg-emerald-50/40', 'shadow-md');
+            msg.textContent = 'Manutenzione completa: batteria nuova ({oem_safe}) + sostituzione consumabili usurati.';
         }}
         msg.classList.remove('hidden');
     }}
@@ -313,50 +449,143 @@ def generate_model_page(item, db, today_str):
 def generate_index_page(db, today_str):
     cards_html = ""
     for item in db:
+        cat_lower = item["categoria"].lower()
+        cat_group = "robot"
+        if "tagliaerba" in cat_lower:
+            cat_group = "tagliaerba"
+        elif "scopa" in cat_lower or "lavapavimenti" in cat_lower:
+            cat_group = "scopa"
+
         cards_html += f"""
-        <a href="/modello/{item['id']}.html" class="block bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-md transition" data-search="{item['marca'].lower()} {item['modello'].lower()} {item['codice_oem_batteria'].lower()}">
-            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{item['categoria']}</span>
-            <h2 class="text-lg font-bold text-slate-900 mt-2">{item['marca']} {item['modello']}</h2>
-            <p class="text-sm text-slate-600 mt-1">Cod. Batteria: <span class="font-mono font-semibold">{item['codice_oem_batteria']}</span></p>
-            <p class="text-xs text-slate-500 mt-2">Spec: {item['specifiche_batteria']} | Fascia: {item['fascia_prezzo_ricambio']}</p>
-            <span class="inline-block mt-3 text-sm font-semibold text-emerald-600">Apri tabella compatibilità &rarr;</span>
+        <a href="/modello/{item['id']}.html" class="model-card group flex flex-col justify-between bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm hover:border-emerald-500 hover:shadow-lg hover:-translate-y-0.5 transition-all" data-cat="{cat_group}" data-search="{item['marca'].lower()} {item['modello'].lower()} {item['codice_oem_batteria'].lower()} {cat_lower}">
+            <div>
+                <div class="flex items-center justify-between gap-2 mb-3">
+                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 rounded-full">{item['marca']}</span>
+                    <span class="text-[11px] font-medium text-slate-400">{item['fascia_prezzo_ricambio']}</span>
+                </div>
+                <h2 class="text-base font-extrabold text-slate-900 group-hover:text-emerald-700 transition leading-snug">{item['modello']}</h2>
+                <p class="text-xs text-slate-500 mt-1">{item['categoria']}</p>
+            </div>
+            <div class="mt-4 pt-3.5 border-t border-slate-100">
+                <div class="flex items-center justify-between text-xs mb-2">
+                    <span class="text-slate-400 font-medium">Cod. OEM:</span>
+                    <span class="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{item['codice_oem_batteria'].split('/')[0].strip()}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs font-bold text-emerald-600 group-hover:text-emerald-700">
+                    <span>Verifica compatibilità</span>
+                    <span>&rarr;</span>
+                </div>
+            </div>
         </a>
         """
+
+    extra_head = f"""<meta name="google-site-verification" content="pBkbOhlZXa5p-vR2Xff77ujhx4NbinX1HerB6K08qRw" />
+    <link rel="alternate" type="application/rss+xml" title="{NOME_PORTALE} RSS Feed" href="{DOMINIO_SITO}/feed.xml">"""
+
+    head_html = get_head_assets(
+        f"{NOME_PORTALE} - Database Compatibilità Batterie e Ricambi OEM ({today_str})",
+        "Verifica subito codice batteria OEM, voltaggio, dimensioni e kit ricambi compatibili per robot aspirapolvere, tagliaerba e scope senza fili.",
+        f"{DOMINIO_SITO}/index.html",
+        extra_head
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-site-verification" content="pBkbOhlZXa5p-vR2Xff77ujhx4NbinX1HerB6K08qRw" />
-    <title>{NOME_PORTALE} - Database Compatibilità Batterie e Ricambi Robot</title>
-    <meta name="description" content="Trova subito il codice batteria OEM, le misure esatte e i kit ricambi compatibili per il tuo robot aspirapolvere o tagliaerba.">
-    <link rel="alternate" type="application/rss+xml" title="{NOME_PORTALE} RSS Feed" href="{DOMINIO_SITO}/feed.xml">
-    <script src="https://cdn.tailwindcss.com"></script>
+    {head_html}
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
-    <header class="bg-slate-900 text-white py-12 px-6 text-center">
-        <div class="max-w-3xl mx-auto">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-emerald-400 mb-3">{NOME_PORTALE}</h1>
-            <p class="text-slate-300 text-lg mb-6">Database tecnico di compatibilità per batterie OEM, filtri HEPA, lame e spazzole di ricambio. Aggiornato al {today_str}.</p>
-            <input type="text" id="searchInput" onkeyup="filterModels()" placeholder="Cerca modello o codice batteria (es. Dreame L10s, WR141E, BRR-2P4S)..." class="w-full px-5 py-4 rounded-xl text-slate-900 font-medium shadow-lg focus:outline-none focus:ring-4 focus:ring-emerald-500">
-        </div>
-    </header>
+<body class="bg-slate-100/80 text-slate-800 font-sans antialiased selection:bg-emerald-200 selection:text-slate-900">
+    {get_navbar(today_str)}
 
-    <main class="max-w-5xl mx-auto px-4 py-10">
-        <div id="modelsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <!-- Hero Tecnico -->
+    <section class="bg-slate-950 text-white border-b border-slate-800">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16 text-center">
+            <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-bold px-3.5 py-1.5 rounded-full mb-5">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                <span>{len(db)} MODELLI VERIFICATI IN ARCHIVIO</span>
+            </div>
+            <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white max-w-3xl mx-auto leading-tight">
+                Trova il ricambio compatibile al 100% senza errori di codice.
+            </h1>
+            <p class="text-slate-400 text-base sm:text-lg mt-4 max-w-2xl mx-auto">
+                Controlla voltaggio, misure del vano e sigla OEM della batteria per robot aspirapolvere, tagliaerba e scope senza fili.
+            </p>
+
+            <!-- Barra di Ricerca -->
+            <div class="max-w-2xl mx-auto mt-8 relative">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+                </div>
+                <input type="text" id="searchInput" onkeyup="filterModels()" placeholder="Cerca marca, modello o codice OEM (es. Dyson V11, Dreame L10s, ABL-D1, WR141E)..." class="w-full pl-12 pr-5 py-4 rounded-2xl bg-white text-slate-900 font-medium text-sm sm:text-base shadow-xl focus:outline-none focus:ring-4 focus:ring-emerald-500/50">
+            </div>
+
+            <!-- Filtri Rapidi Marca -->
+            <div class="flex flex-wrap justify-center gap-2 mt-5 text-xs">
+                <span class="text-slate-500 py-1 font-medium">Ricerche frequenti:</span>
+                <button type="button" onclick="quickBrand('dyson')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Dyson</button>
+                <button type="button" onclick="quickBrand('dreame')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Dreame</button>
+                <button type="button" onclick="quickBrand('roborock')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Roborock</button>
+                <button type="button" onclick="quickBrand('roomba')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Roomba</button>
+                <button type="button" onclick="quickBrand('worx')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Worx Landroid</button>
+                <button type="button" onclick="quickBrand('folletto')" class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3 py-1 rounded-full transition">Folletto</button>
+            </div>
+        </div>
+    </section>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        <!-- Schede Categoria -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div class="flex flex-wrap gap-2" id="catTabs">
+                <button type="button" onclick="setCategory('all', this)" class="cat-btn bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">Tutti ({len(db)})</button>
+                <button type="button" onclick="setCategory('robot', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Aspirapolvere</button>
+                <button type="button" onclick="setCategory('scopa', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Scope Senza Fili</button>
+                <button type="button" onclick="setCategory('tagliaerba', this)" class="cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition">Robot Tagliaerba</button>
+            </div>
+            <p id="resultsCounter" class="text-xs font-semibold text-slate-500">Visualizzati: {len(db)} modelli</p>
+        </div>
+
+        <div id="modelsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {cards_html}
         </div>
     </main>
 
+    {get_footer()}
+
     <script>
+    let currentCat = 'all';
+
+    function setCategory(cat, btn) {{
+        currentCat = cat;
+        document.querySelectorAll('.cat-btn').forEach(b => {{
+            b.className = 'cat-btn bg-white text-slate-600 hover:bg-slate-50 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition';
+        }});
+        btn.className = 'cat-btn bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition';
+        filterModels();
+    }}
+
+    function quickBrand(brand) {{
+        const input = document.getElementById('searchInput');
+        input.value = brand;
+        filterModels();
+    }}
+
     function filterModels() {{
-        const q = document.getElementById('searchInput').value.toLowerCase();
-        const cards = document.querySelectorAll('#modelsGrid a');
+        const q = document.getElementById('searchInput').value.toLowerCase().trim();
+        const cards = document.querySelectorAll('#modelsGrid .model-card');
+        let visible = 0;
         cards.forEach(card => {{
             const text = card.getAttribute('data-search');
-            card.style.display = text.includes(q) ? 'block' : 'none';
+            const cat = card.getAttribute('data-cat');
+            const matchText = text.includes(q);
+            const matchCat = (currentCat === 'all' || cat === currentCat);
+            if (matchText && matchCat) {{
+                card.style.display = 'flex';
+                visible++;
+            }} else {{
+                card.style.display = 'none';
+            }}
         }});
+        document.getElementById('resultsCounter').textContent = 'Visualizzati: ' + visible + ' modelli';
     }}
     </script>
 </body>
@@ -417,12 +646,10 @@ def main():
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=2)
 
-    # Genera Home Page
     index_html = generate_index_page(db, today_str)
     with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as out:
         out.write(index_html)
 
-    # Genera Sitemap.xml e lista URL
     all_urls = [f"{DOMINIO_SITO}/index.html"]
     urls_xml = [f"<url><loc>{DOMINIO_SITO}/index.html</loc><lastmod>{today_iso}</lastmod><priority>1.0</priority></url>"]
     rss_items = []
@@ -442,7 +669,6 @@ def main():
     with open(os.path.join(OUTPUT_DIR, "sitemap.xml"), "w", encoding="utf-8") as out:
         out.write(sitemap_xml)
 
-    # Genera Feed RSS automatico (feed.xml)
     feed_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
 <channel>
@@ -455,7 +681,6 @@ def main():
     with open(os.path.join(OUTPUT_DIR, "feed.xml"), "w", encoding="utf-8") as out:
         out.write(feed_xml)
 
-    # Genera robots.txt e file chiave IndexNow
     robots_txt = f"User-agent: *\nAllow: /\nSitemap: {DOMINIO_SITO}/sitemap.xml\n"
     with open(os.path.join(OUTPUT_DIR, "robots.txt"), "w", encoding="utf-8") as out:
         out.write(robots_txt)
@@ -463,10 +688,9 @@ def main():
     with open(os.path.join(OUTPUT_DIR, f"{INDEXNOW_KEY}.txt"), "w", encoding="utf-8") as out:
         out.write(INDEXNOW_KEY)
 
-    # Ping automatico ai motori di ricerca
     ping_indexnow(all_urls)
 
-    print(f"Portale generato con successo: {len(db)} pagine, feed.xml e IndexNow completati.")
+    print(f"Portale generato con successo: {len(db)} pagine aggiornate con nuovo design.")
 
 
 if __name__ == "__main__":
