@@ -41,7 +41,7 @@
             <div class="flex items-center gap-3">
                 <span class="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-slate-300">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Listino verificado: 27/11/2026
+                    Listino verificato: 27/11/2026
                 </span>
                 <a href="/index.html" class="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-lg transition">
                     Catalogo
@@ -51,16 +51,14 @@
     </header>
 
     <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <!-- Breadcrumb -->
         <nav class="flex items-center gap-2 text-xs font-medium text-slate-500 mb-5 overflow-x-auto whitespace-nowrap">
             <a href="/index.html" class="hover:text-slate-900 transition">Catalogo</a>
             <span>/</span>
-            <span>Robot Aspirapolvere</span>
+            <a href="/marca/dreame.html" class="hover:text-emerald-700 transition">Dreame</a>
             <span>/</span>
-            <span class="text-slate-900 font-semibold">Dreame L10s Pro Ultra Heat / L10 Prime</span>
+            <span class="text-slate-900 font-semibold">L10s Pro Ultra Heat / L10 Prime</span>
         </nav>
 
-        <!-- Card Principale -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden mb-8">
             <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 px-6 py-7 text-white border-b border-slate-800">
                 <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -79,7 +77,6 @@
             </div>
 
             <div class="p-6 sm:p-8">
-                <!-- 4 KPI Tecnici a colpo d'occhio -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-7">
                     <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Codice OEM</p>
@@ -99,7 +96,6 @@
                     </div>
                 </div>
 
-                <!-- Selettore interattivo del problema -->
                 <div class="bg-slate-900 text-white rounded-xl p-5 mb-7 shadow-inner">
                     <div class="flex items-center justify-between mb-3">
                         <p class="text-xs font-bold uppercase tracking-wider text-emerald-400">Selettore Rapido Ricambio</p>
@@ -122,50 +118,59 @@
                     <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-3 border-t border-slate-800"></p>
                 </div>
 
-                <!-- Area Bottoni Acquisto -->
                 <div class="space-y-4 mb-7">
-                    <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <div>
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
-                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile (P2150-8S2P-XWDLS)</h2>
-                            </div>
-                            <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <a href="https://www.amazon.it/s?k=batteria+Dreame+L10s+Pro+Ultra+Heat+%2F+L10+Prime&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Verifica su Amazon.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                            <a href="https://www.ebay.it/sch/i.html?_nkw=batteria+Dreame+L10s+Pro+Ultra+Heat+%2F+L10+Prime&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid=5339253914&customid=dreame-l10s-pro-ultra-heat-batt&toolid=10001&mkevt=1" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Confronta su eBay.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                        </div>
-                    </div>
+        <div id="box-batteria" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Ricambio Principale</span>
+                    <h2 class="text-base font-extrabold text-slate-900 mt-1">Batteria Compatibile (P2150-8S2P-XWDLS)</h2>
+                </div>
+                <span class="text-xs font-medium text-slate-500">Reso gratuito 30 giorni</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a href="https://www.amazon.it/s?k=batteria+Dreame+L10s+Pro+Ultra+Heat+%2F+L10+Prime&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Verifica su Amazon.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+                <a href="https://www.ebay.it/sch/i.html?_nkw=batteria+Dreame+L10s+Pro+Ultra+Heat+%2F+L10+Prime&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid=5339253914&customid=dreame-l10s-pro-ultra-heat-batt&toolid=10001&mkevt=1" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Confronta su eBay.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+            </div>
+        </div>
 
-                    <div id="box-kit" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
-                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <div>
-                                <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Manutenzione Periodica</span>
-                                <h2 class="text-base font-extrabold text-slate-900 mt-1">Kit Consumabili (Spazzola TriCut / gomma)</h2>
-                            </div>
-                            <span class="text-xs font-medium text-slate-500">Spedizione rapida</span>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <a href="https://www.amazon.it/s?k=kit+ricambi+batteria+Dreame+L10s+Pro+Ultra+Heat&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Kit Ricambi su Amazon.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                            <a href="https://www.ebay.it/sch/i.html?_nkw=ricambi+Dreame+L10s+Pro+Ultra+Heat&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid=5339253914&customid=dreame-l10s-pro-ultra-heat-kit&toolid=10001&mkevt=1" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
-                                <span>Kit Ricambi su eBay.it</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
-                            </a>
-                        </div>
+        <div id="box-kit" class="p-5 rounded-xl border-2 border-slate-200 bg-white transition-all">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Manutenzione Periodica</span>
+                    <h2 class="text-base font-extrabold text-slate-900 mt-1">Kit Consumabili (Spazzola TriCut / gomma)</h2>
+                </div>
+                <span class="text-xs font-medium text-slate-500">Spedizione rapida</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <a href="https://www.amazon.it/s?k=kit+ricambi+batteria+Dreame+L10s+Pro+Ultra+Heat&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Kit Ricambi su Amazon.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+                <a href="https://www.ebay.it/sch/i.html?_nkw=ricambi+Dreame+L10s+Pro+Ultra+Heat&mkcid=1&mkrid=724-53478-19255-0&siteid=101&campid=5339253914&customid=dreame-l10s-pro-ultra-heat-kit&toolid=10001&mkevt=1" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-sm py-3.5 px-5 rounded-xl shadow-sm transition">
+                    <span>Kit Ricambi su eBay.it</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+
+                <!-- Collegamento alla guida guasti e montaggio -->
+                <div class="mb-7 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-extrabold text-amber-950">LED lampeggiante o errore batteria su L10s Pro Ultra Heat / L10 Prime?</p>
+                        <p class="text-xs text-amber-800 mt-0.5">Leggi la procedura passo-passo di sostituzione e reset del sistema BMS.</p>
                     </div>
+                    <a href="/guida/sostituzione-batteria-dreame-l10s-pro-ultra-heat.html" class="shrink-0 text-xs font-bold bg-amber-950 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg transition text-center">
+                        Apri Guida Montaggio &rarr;
+                    </a>
                 </div>
 
-                <!-- Tabella Dettagliata -->
                 <div class="border border-slate-200 rounded-xl overflow-hidden">
                     <div class="bg-slate-50 px-4 py-3 border-b border-slate-200">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Specifiche Tecniche Complete</h3>
@@ -198,18 +203,11 @@
             </div>
         </div>
 
-        <!-- Note Tecniche -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
-            <div class="flex items-center gap-2.5 mb-3">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
-                </div>
-                <h2 class="text-lg font-extrabold text-slate-900">Note Tecniche di Installazione e Sicurezza</h2>
-            </div>
+            <h2 class="text-lg font-extrabold text-slate-900 mb-3">Note Tecniche di Installazione e Sicurezza</h2>
             <p class="text-slate-600 text-sm sm:text-base leading-relaxed">Per il modello Dreame L10s Pro Ultra Heat / L10 Prime, è fondamentale verificare che la batteria sostitutiva rispetti il codice originale P2150-8S2P-XWDLS e le specifiche 14.4V - 5200mAh Li-Ion. Controllare sempre le dimensioni del vano (133 x 38 x 38 mm) e la corrispondenza del connettore prima dell'acquisto. Al primo montaggio, effettuare un ciclo di carica completa di almeno 6 ore consecutive.</p>
         </div>
 
-        <!-- FAQ -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200/90 p-6 sm:p-8 mb-8">
             <h2 class="text-lg font-extrabold text-slate-900 mb-4">Domande Frequenti su Dreame L10s Pro Ultra Heat / L10 Prime</h2>
             <div class="space-y-3">
@@ -241,7 +239,6 @@
             </div>
         </div>
 
-        <!-- Correlati -->
         <div>
             <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-500 mb-3">Altre Schede Verificate (Dreame)</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
@@ -276,6 +273,10 @@
 
     <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 mt-16">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+            <div class="mb-8 pb-6 border-b border-slate-800/80">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Archivio Ricambi per Marca</p>
+                <div class="text-xs text-slate-400 leading-relaxed"><a href="/marca/dreame.html" class="hover:text-emerald-400 transition">Dreame</a> &middot; <a href="/marca/roborock.html" class="hover:text-emerald-400 transition">Roborock</a> &middot; <a href="/marca/irobot-roomba.html" class="hover:text-emerald-400 transition">iRobot Roomba</a> &middot; <a href="/marca/dyson.html" class="hover:text-emerald-400 transition">Dyson</a> &middot; <a href="/marca/xiaomi.html" class="hover:text-emerald-400 transition">Xiaomi</a> &middot; <a href="/marca/ecovacs-deebot.html" class="hover:text-emerald-400 transition">Ecovacs Deebot</a> &middot; <a href="/marca/worx-landroid.html" class="hover:text-emerald-400 transition">Worx Landroid</a> &middot; <a href="/marca/husqvarna-automower.html" class="hover:text-emerald-400 transition">Husqvarna Automower</a> &middot; <a href="/marca/tineco.html" class="hover:text-emerald-400 transition">Tineco</a> &middot; <a href="/marca/vorwerk-folletto.html" class="hover:text-emerald-400 transition">Vorwerk Folletto</a></div>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 pb-8 border-b border-slate-800/80 text-xs leading-relaxed">
                 <div>
                     <p class="text-white font-bold text-sm mb-2">RicambiRobot Check Italia</p>
