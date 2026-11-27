@@ -76,22 +76,31 @@ CATEGORIES_META = {
 
 
 def call_gemini_ai(item):
-    """Chiama Gemini Flash gratis per generare note di compatibilita e FAQ tecniche uniche."""
+    """Chiama Gemini Flash gratis per generare nota tecnica, FAQ e guida di smontaggio unica per ogni modello."""
     if not GEMINI_API_KEY:
         return None
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    wired_hint = "dispositivo alimentato a filo 230V (senza batteria, focus su sacchetti/filtri/accessori)" if is_wired_device(item) else "dispositivo a batteria (focus su sostituzione pacco batteria, connettore/attacco e reset errore)"
+
     prompt = f"""
-    Sei un tecnico specializzato in ricambi elettronici. Scrivi in italiano per il modello {item['marca']} {item['modello']} ({item['categoria']}).
-    Dati tecnici noti: Codice ricambio OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, dimensioni {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
+    Sei un tecnico specializzato nella riparazione di elettrodomestici. Scrivi in italiano tecnico chiaro e concreto per {item['marca']} {item['modello']} ({item['categoria']} - {wired_hint}).
+    Dati tecnici verificati: Codice OEM {item['codice_oem_batteria']}, specifiche {item['specifiche_batteria']}, misure {item['dimensioni_mm']}, consumabili {item['consumabili_inclusi']}.
     
     Restituisci ESCLUSAMENTE un oggetto JSON valido con questa struttura esatta (nessun markdown attorno):
     {{
-      "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici per verificare la compatibilita del ricambio, quando sostituirlo e come evitare errori di montaggio.",
+      "nota_tecnica": "Un paragrafo di 60 parole con consigli pratici specifici per {item['marca']} {item['modello']} su come verificare codice OEM, connettori/attacchi ed evitare errori di montaggio.",
+      "sintomo_guasto": "Una frase di 18-22 parole sul sintomo tipico di usura o errore LED/display su {item['marca']} {item['modello']} che richiede il cambio ricambi.",
       "faq": [
-        {{"q": "Domanda tecnica specifica sul ricambio 1?", "a": "Risposta diretta e precisa di 30 parole."}},
-        {{"q": "Domanda tecnica sulla durata o compatibilita 2?", "a": "Risposta diretta e precisa di 30 parole."}},
-        {{"q": "Come ripristinare le prestazioni ottimali dopo il cambio ricambi su {item['modello']}?", "a": "Risposta procedurale di 30 parole."}}
+        {{"q": "Domanda tecnica specifica sul ricambio principale di {item['modello']}?", "a": "Risposta diretta e precisa di 30 parole."}},
+        {{"q": "Domanda tecnica sulla compatibilita o durata su {item['modello']}?", "a": "Risposta diretta e precisa di 30 parole."}},
+        {{"q": "Come ripristinare il funzionamento dopo il cambio ricambi su {item['modello']}?", "a": "Risposta procedurale di 30 parole."}}
+      ],
+      "guida_passi": [
+        {{"name": "Titolo breve passaggio 1 (verifica codice)", "text": "Istruzione pratica di 30-35 parole specifica per {item['marca']} {item['modello']} citando il codice {item['codice_oem_batteria']}."}},
+        {{"name": "Titolo breve passaggio 2 (apertura vano/sgancio)", "text": "Istruzione pratica di 30-35 parole su come aprire l'alloggiamento o sganciare il componente su {item['modello']}."}},
+        {{"name": "Titolo breve passaggio 3 (montaggio e pulizia)", "text": "Istruzione pratica di 30-35 parole sul montaggio del nuovo ricambio e sostituzione di {item['consumabili_inclusi']}."}},
+        {{"name": "Titolo breve passaggio 4 (calibrazione/test)", "text": "Istruzione pratica di 30-35 parole su ricarica iniziale, calibrazione BMS o test di tenuta su {item['modello']}."}}
       ]
     }}
     """
@@ -111,12 +120,132 @@ def call_gemini_ai(item):
 
 
 def get_fallback_content(item):
-    nota = (
-        f"Per il modello {item['marca']} {item['modello']}, è fondamentale verificare che il ricambio sostitutivo "
-        f"rispetti il codice originale {item['codice_oem_batteria']} e le specifiche {item['specifiche_batteria']}. "
-        f"Controllare sempre le dimensioni del vano ({item['dimensioni_mm']}) e la corrispondenza degli attacchi prima dell'acquisto. "
-        f"In caso di sostituzione batteria, effettuare un ciclo di carica completa di almeno 6 ore consecutive."
-    )
+    """Contenuto tecnico differenziato per architettura dispositivo se l'API AI non ha ancora elaborato il modello."""
+    marca_l = item["marca"].lower()
+    cat_l = item["categoria"].lower()
+    wired = is_wired_device(item)
+
+    if wired:
+        sintomo = f"Calo improvviso della potenza di aspirazione, surriscaldamento del motore o fuoriuscita di polvere fine su {item['marca']} {item['modello']}."
+        nota = (
+            f"Su {item['marca']} {item['modello']} (alimentazione 230V), l'efficienza del motore dipende dalla tenuta dei sacchetti e dei filtri {item['codice_oem_batteria']}. "
+            f"Verificare sempre l'integrità delle guarnizioni del vano ({item['dimensioni_mm']}) e sostituire regolarmente {item['consumabili_inclusi']} per evitare sovraccarichi termici."
+        )
+        steps = [
+            {
+                "name": "Controllo sigla sacchetti e filtri OEM",
+                "text": f"Verifica sull'alloggiamento interno di {item['marca']} {item['modello']} la sigla {item['codice_oem_batteria']} per assicurarti che flangia e guarnizioni combacino perfettamente."
+            },
+            {
+                "name": "Scollegamento dalla presa 230V e apertura vano",
+                "text": f"Spegni l'interruttore principale e stacca sempre la spina dalla rete elettrica prima di sganciare il coperchio superiore o il vano filtri di {item['modello']}."
+            },
+            {
+                "name": "Sostituzione consumabili e pulizia sede",
+                "text": f"Estrai i ricambi esauriti ({item['consumabili_inclusi']}), rimuovi eventuali residui di polvere dai bordi in gomma e inserisci i nuovi filtri fino allo scatto."
+            },
+            {
+                "name": "Verifica chiusura ermetica e prova flusso",
+                "text": "Richiudi lo sportello controllando che non vi siano fessure lungo la guarnizione e avvia l'aspirazione per confermare il ripristino della depressione."
+            }
+        ]
+    elif "tagliaerba" in cat_l:
+        sintomo = f"Rientro anticipato alla stazione di ricarica, taglio irregolare del prato o avviso tensione bassa su {item['marca']} {item['modello']}."
+        nota = (
+            f"Per il robot tagliaerba {item['marca']} {item['modello']}, è indispensabile montare un pacco batteria con codice {item['codice_oem_batteria']} "
+            f"e tensione {item['specifiche_batteria']}. Controllare la guarnizione impermeabile del vano ({item['dimensioni_mm']}) e bilanciare il disco sostituendo tutte le lame contemporaneamente."
+        )
+        steps = [
+            {
+                "name": "Verifica voltaggio e codice batteria OEM",
+                "text": f"Controlla sull'etichetta della batteria originale di {item['marca']} {item['modello']} il codice {item['codice_oem_batteria']} e la tensione {item['specifiche_batteria']}."
+            },
+            {
+                "name": "Spegnimento totale e apertura sportello stagno",
+                "text": f"Premi il tasto STOP, porta l'interruttore generale su OFF e svita il coperchio inferiore del vano batteria (dimensioni {item['dimensioni_mm']})."
+            },
+            {
+                "name": "Collegamento batteria e rinnovo lame",
+                "text": f"Collega il connettore della nuova batteria senza forzare i pin, richiudi la guarnizione stagna e installa i consumabili nuovi ({item['consumabili_inclusi']})."
+            },
+            {
+                "name": "Ricarica completa in base e sblocco PIN",
+                "text": "Posiziona il robot sui contatti della base di ricarica fino al 100%, inserisci il codice PIN e avvia un ciclo di taglio di prova."
+            }
+        ]
+    elif "dyson" in marca_l:
+        sintomo = f"LED rosso lampeggiante sul corpo motore o spegnimento immediato dopo pochi secondi in modalità Max su {item['marca']} {item['modello']}."
+        nota = (
+            f"Prima di ordinare la batteria per {item['marca']} {item['modello']}, verifica se il tuo modello utilizza l'attacco a viti o a sgancio rapido Click-in ({item['codice_oem_batteria']}). "
+            f"Rispetta sempre la tensione {item['specifiche_batteria']} e lascia asciugare il filtro HEPA per almeno 24 ore dopo il lavaggio prima di riaccendere."
+        )
+        steps = [
+            {
+                "name": "Identificazione attacco (Viti vs Click-in) e codice",
+                "text": f"Controlla sotto l'impugnatura di {item['marca']} {item['modello']} il codice {item['codice_oem_batteria']} ({item['specifiche_batteria']}) e verifica la presenza di viti o pulsante rosso."
+            },
+            {
+                "name": "Rimozione del pacco batteria esaurito",
+                "text": "Svuota il contenitore della polvere, rimuovi la vite posteriore sull'impugnatura (o premi il tasto di sgancio Click-in) e sfila la batteria verso il basso."
+            },
+            {
+                "name": "Inserimento nuova batteria e controllo filtri",
+                "text": f"Allinea le guide del nuovo pacco batteria fino al clic di blocco e verifica la pulizia di {item['consumabili_inclusi']} per non ostruire il flusso d'aria."
+            },
+            {
+                "name": "Ciclo di carica completa prima dell'uso",
+                "text": "Collega il caricatore originale fino allo spegnimento del LED blu di ricarica (circa 3,5 - 4,5 ore) prima di utilizzare la modalità Boost."
+            }
+        ]
+    elif "scopa" in cat_l or "lavapavimenti" in cat_l:
+        sintomo = f"Autonomia inferiore a pochi minuti, ricarica interrotta o calo di aspirazione su {item['marca']} {item['modello']}."
+        nota = (
+            f"Per {item['marca']} {item['modello']}, assicurati che la batteria sostitutiva corrisponda al codice {item['codice_oem_batteria']} "
+            f"e alle specifiche {item['specifiche_batteria']}. Pulisci regolarmente i rulli e i filtri ({item['consumabili_inclusi']}) per evitare il blocco della spazzola motorizzata."
+        )
+        steps = [
+            {
+                "name": "Controllo sigla batteria e specifiche elettriche",
+                "text": f"Verifica sulla targhetta di {item['marca']} {item['modello']} la corrispondenza con il codice {item['codice_oem_batteria']} ({item['specifiche_batteria']})."
+            },
+            {
+                "name": "Sgancio batteria e rimozione serbatoio/rullo",
+                "text": f"Spegni l'apparecchio, scollegalo dalla base di ricarica e sblocca l'alloggiamento batteria o il coperchio vano ({item['dimensioni_mm']})."
+            },
+            {
+                "name": "Installazione ricambio e manutenzione rulli/filtri",
+                "text": f"Inserisci il nuovo pacco batteria verificando il fermo meccanico e rinnova i componenti soggetti a usura ({item['consumabili_inclusi']})."
+            },
+            {
+                "name": "Ricarica di calibrazione iniziale",
+                "text": "Riponi la scopa elettrica sulla stazione di ricarica per un ciclo completo ininterrotto prima di avviare la pulizia."
+            }
+        ]
+    else:
+        sintomo = f"Errore batteria sul display/app, mancato rientro alla base o arresto durante la pulizia su {item['marca']} {item['modello']}."
+        nota = (
+            f"Per il robot {item['marca']} {item['modello']}, è fondamentale verificare che la batteria sostitutiva rispetti il codice {item['codice_oem_batteria']} "
+            f"e le specifiche {item['specifiche_batteria']}. Controllare la polarità del connettore, le misure {item['dimensioni_mm']} e rinnovare {item['consumabili_inclusi']}."
+        )
+        steps = [
+            {
+                "name": "Verifica codice OEM, tensione e connettore",
+                "text": f"Controlla sull'etichetta della batteria di {item['marca']} {item['modello']} il codice {item['codice_oem_batteria']} ({item['specifiche_batteria']}) e il numero di pin del connettore."
+            },
+            {
+                "name": "Spegnimento e apertura sportello inferiore",
+                "text": f"Capovolgi {item['modello']} su un panno morbido, svita la spazzola laterale se necessario e rimuovi le viti del coperchio vano batteria ({item['dimensioni_mm']})."
+            },
+            {
+                "name": "Montaggio nuova batteria e cambio consumabili",
+                "text": f"Scollega il vecchio pacco, collega la nuova batteria rispettando la guida del connettore e sostituisci i ricambi usurati ({item['consumabili_inclusi']})."
+            },
+            {
+                "name": "Calibrazione BMS di 6 ore sulla base",
+                "text": "Richiudi il coperchio inferiore, posiziona il robot sui contatti della base e lascialo in carica continua per almeno 6 ore prima del primo avvio."
+            }
+        ]
+
     faq = [
         {
             "q": f"Qual è il codice ricambio originale per {item['marca']} {item['modello']}?",
@@ -131,7 +260,12 @@ def get_fallback_content(item):
             "a": "I filtri HEPA e le spazzole laterali vanno sostituiti ogni 3-4 mesi di utilizzo, mentre rulli, sacchetti e lame vanno rinnovati regolarmente per non sforzare il motore."
         }
     ]
-    return {"nota_tecnica": nota, "faq": faq}
+    return {
+        "nota_tecnica": nota,
+        "sintomo_guasto": sintomo,
+        "faq": faq,
+        "guida_passi": steps
+    }
 
 
 def build_affiliate_links(item, suffix=""):
@@ -496,7 +630,7 @@ def generate_model_page(item, db, brands_list, today_str):
 
                 <div class="mb-7 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <p class="text-xs font-extrabold text-amber-950">Calo di prestazioni o manutenzione su {item['modello']}?</p>
+                        <p class="text-xs font-extrabold text-amber-950">{item['sintomo_guasto_ai']}</p>
                         <p class="text-xs text-amber-800 mt-0.5">Leggi la procedura passo-passo di sostituzione e ripristino ottimale.</p>
                     </div>
                     <a href="/guida/sostituzione-batteria-{item['id']}.html" class="shrink-0 text-xs font-bold bg-amber-950 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg transition text-center">
@@ -594,49 +728,14 @@ def generate_guide_page(item, db, brands_list, today_str):
     amz_batt_url, eby_batt_url, amz_kit_url, eby_kit_url = build_affiliate_links(item, suffix="guida")
     brand_slug = slugify(item["marca"])
     wired = is_wired_device(item)
+    steps = item["guida_passi_ai"]
 
     if wired:
         title = f"Sostituzione Filtri, Sacchetti e Manutenzione {item['marca']} {item['modello']} - Guida {today_str}"
         desc = f"Come sostituire filtri, sacchetti ({item['codice_oem_batteria']}) e accessori soggetti a usura su {item['marca']} {item['modello']}."
-        steps = [
-            {
-                "name": "Verifica codice OEM dei consumabili",
-                "text": f"Controlla la sigla originale {item['codice_oem_batteria']} prima dell'acquisto per assicurarti che l'aggancio del sacchetto o del tubo sia compatibile con {item['marca']} {item['modello']}."
-            },
-            {
-                "name": "Scollegamento dalla rete elettrica",
-                "text": f"Spegni {item['marca']} {item['modello']} e stacca sempre la spina dalla presa 230V prima di aprire il vano filtro o sganciare gli accessori."
-            },
-            {
-                "name": "Sostituzione filtri HEPA e consumabili",
-                "text": f"Rimuovi i componenti usurati ({item['consumabili_inclusi']}), pulisci l'alloggiamento interno con un panno asciutto e inserisci i nuovi ricambi fino allo scatto."
-            },
-            {
-                "name": "Test di aspirazione e tenuta",
-                "text": "Richiudi lo sportello verificando che le guarnizioni siano ben allineate e avvia il motore per controllare il ripristino del flusso d'aria."
-            }
-        ]
     else:
         title = f"Sostituzione Batteria e Reset Errore {item['marca']} {item['modello']} - Guida {today_str}"
         desc = f"Come sostituire la batteria ({item['codice_oem_batteria']}) e risolvere i problemi di ricarica o LED lampeggiante su {item['marca']} {item['modello']}."
-        steps = [
-            {
-                "name": "Verifica codice OEM e tensione",
-                "text": f"Controlla sull'etichetta del pacco batteria originale il codice {item['codice_oem_batteria']} e la tensione {item['specifiche_batteria']}. Non utilizzare mai batterie con voltaggio differente."
-            },
-            {
-                "name": "Scollegamento in sicurezza e apertura vano",
-                "text": f"Spegni completamente {item['marca']} {item['modello']}, scollegalo dalla base di ricarica e rimuovi le viti del vano inferiore (ingombro previsto: {item['dimensioni_mm']})."
-            },
-            {
-                "name": "Installazione nuova batteria e pulizia contatti",
-                "text": f"Inserisci il nuovo pacco batteria verificando l'incastro del connettore. Approfitta dell'apertura per pulire i contatti metallici e sostituire i filtri usurati ({item['consumabili_inclusi']})."
-            },
-            {
-                "name": "Calibrazione e ciclo di carica iniziale",
-                "text": "Riposiziona il dispositivo sulla base e lascialo in carica continua per almeno 6 ore senza interruzioni per calibrare il circuito elettronico BMS."
-            }
-        ]
 
     schemas_graph = json.dumps({
         "@context": "https://schema.org",
@@ -711,7 +810,7 @@ def generate_guide_page(item, db, brands_list, today_str):
                     {"Sostituzione Filtri, Sacchetti e Ricambi" if wired else "Sostituzione Batteria e Risoluzione Errori"} {item['marca']} {item['modello']}
                 </h1>
                 <p class="text-slate-300 text-sm mt-2 leading-relaxed">
-                    Guida pratica per verificare il codice OEM <span class="font-mono text-emerald-400 font-bold">{item['codice_oem_batteria']}</span> ed eseguire il cambio senza errori.
+                    {item['sintomo_guasto_ai']} Verifica il codice OEM <span class="font-mono text-emerald-400 font-bold">{item['codice_oem_batteria']}</span> prima di procedere.
                 </p>
             </div>
 
@@ -1064,22 +1163,46 @@ def main():
     db_modified = False
 
     for item in db:
-        if not item.get("ai_enriched", False) and ai_calls < MAX_AI_CALLS_PER_RUN:
+        needs_ai = (not item.get("ai_enriched", False)) or (not item.get("guida_passi_ai"))
+        if needs_ai and ai_calls < MAX_AI_CALLS_PER_RUN:
             ai_res = call_gemini_ai(item)
-            if ai_res and "nota_tecnica" in ai_res and "faq" in ai_res:
+            if (
+                ai_res
+                and "nota_tecnica" in ai_res
+                and "faq" in ai_res
+                and "guida_passi" in ai_res
+                and len(ai_res["guida_passi"]) >= 3
+            ):
                 item["nota_tecnica_ai"] = ai_res["nota_tecnica"]
+                item["sintomo_guasto_ai"] = ai_res.get(
+                    "sintomo_guasto",
+                    f"Calo di autonomia o errore di funzionamento su {item['marca']} {item['modello']}."
+                )
                 item["faq_ai"] = ai_res["faq"]
+                item["guida_passi_ai"] = ai_res["guida_passi"]
                 item["ai_enriched"] = True
                 ai_calls += 1
                 db_modified = True
             else:
                 fb = get_fallback_content(item)
-                item["nota_tecnica_ai"] = fb["nota_tecnica"]
-                item["faq_ai"] = fb["faq"]
-        elif not item.get("nota_tecnica_ai"):
+                if not item.get("nota_tecnica_ai"):
+                    item["nota_tecnica_ai"] = fb["nota_tecnica"]
+                if not item.get("sintomo_guasto_ai"):
+                    item["sintomo_guasto_ai"] = fb["sintomo_guasto"]
+                if not item.get("faq_ai"):
+                    item["faq_ai"] = fb["faq"]
+                if not item.get("guida_passi_ai"):
+                    item["guida_passi_ai"] = fb["guida_passi"]
+        else:
             fb = get_fallback_content(item)
-            item["nota_tecnica_ai"] = fb["nota_tecnica"]
-            item["faq_ai"] = fb["faq"]
+            if not item.get("nota_tecnica_ai"):
+                item["nota_tecnica_ai"] = fb["nota_tecnica"]
+            if not item.get("sintomo_guasto_ai"):
+                item["sintomo_guasto_ai"] = fb["sintomo_guasto"]
+            if not item.get("faq_ai"):
+                item["faq_ai"] = fb["faq"]
+            if not item.get("guida_passi_ai"):
+                item["guida_passi_ai"] = fb["guida_passi"]
 
         page_html = generate_model_page(item, db, brands_list, today_str)
         with open(os.path.join(OUTPUT_DIR, "modello", f"{item['id']}.html"), "w", encoding="utf-8") as out:
