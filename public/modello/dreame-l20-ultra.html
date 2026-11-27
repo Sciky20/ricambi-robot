@@ -27,9 +27,26 @@
             <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
                 Batteria e Kit Ricambi per Dreame L20 Ultra
             </h1>
-            <p class="text-slate-600 mb-6">
+            <p class="text-slate-600 mb-5">
                 Specifiche tecniche ufficiali, codici OEM equivalenti e link diretti ai ricambi compatibili al 100% per il tuo robot aspirapolvere.
             </p>
+
+            <!-- Selettore interattivo del problema -->
+            <div class="bg-slate-900 text-white rounded-xl p-4 mb-6">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2.5">Diagnosi Rapida: qual è il problema del tuo Dreame?</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onclick="evidenziaRicambio('batteria')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#9889; Dura poco / Non carica
+                    </button>
+                    <button type="button" onclick="evidenziaRicambio('kit')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#128295; Aspira poco / Usura
+                    </button>
+                    <button type="button" onclick="evidenziaRicambio('entrambi')" class="text-left text-xs font-semibold bg-slate-800 hover:bg-emerald-600 px-3 py-2.5 rounded-lg border border-slate-700 transition">
+                        &#9989; Manutenzione completa
+                    </button>
+                </div>
+                <p id="diagnosi-msg" class="hidden text-xs text-emerald-300 font-medium mt-3 pt-2.5 border-t border-slate-800"></p>
+            </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden">
@@ -62,9 +79,19 @@
                 </table>
             </div>
 
-            <div class="space-y-4 mt-8">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">1. Batteria di Ricambio Compatibile</p>
+            <!-- Checklist anti-errore prima del clic -->
+            <div class="mt-6 bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-2">Checklist Anti-Errore Prima dell'Acquisto</p>
+                <ul class="text-xs text-slate-700 space-y-1.5">
+                    <li>&#10004; <strong>Voltaggio e sigla verificati:</strong> 14.4V - 6400mAh Li-Ion (92.16Wh) (Cod. P2149-4S2P-XWDLS).</li>
+                    <li>&#10004; <strong>Ingombro esatto:</strong> 136 x 45 x 44 mm compatibile con l'alloggiamento originale.</li>
+                    <li>&#10004; <strong>Acquisto protetto:</strong> reso gratuito entro 30 giorni garantito su Amazon e eBay in caso di errato ordine.</li>
+                </ul>
+            </div>
+
+            <div class="space-y-4 mt-6">
+                <div id="box-batteria" class="p-3.5 rounded-xl border border-slate-200 transition-all">
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">1. Batteria di Ricambio Compatibile (P2149-4S2P-XWDLS)</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <a href="https://www.amazon.it/s?k=batteria+Dreame+L20+Ultra&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
                             Cerca Batteria su Amazon.it &rarr;
@@ -74,8 +101,8 @@
                         </a>
                     </div>
                 </div>
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
+                <div id="box-kit" class="p-3.5 rounded-xl border border-slate-200 transition-all">
+                    <p class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">2. Kit Ricambi (Filtri, Spazzole, Sacchetti o Lame)</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <a href="https://www.amazon.it/s?k=kit+ricambi+batteria+Dreame+L20+Ultra&tag=ricambirobot-21" target="_blank" rel="nofollow sponsored noopener" class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-lg shadow transition text-center">
                             Kit Ricambi su Amazon.it &rarr;
@@ -86,9 +113,6 @@
                     </div>
                 </div>
             </div>
-            <p class="text-xs text-slate-400 mt-3 text-center">
-                *Controlla sempre che il codice P2149-4S2P-XWDLS o la sigla L20 Ultra siano riportati nella descrizione del venditore prima di confermare l'ordine.
-            </p>
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
@@ -96,7 +120,7 @@
             <p class="text-slate-700 leading-relaxed">Per il modello Dreame L20 Ultra, è fondamentale verificare che la batteria sostitutiva rispetti il codice originale P2149-4S2P-XWDLS e le specifiche 14.4V - 6400mAh Li-Ion (92.16Wh). Controllare sempre le dimensioni del vano (136 x 45 x 44 mm) e la corrispondenza del connettore prima dell'acquisto. Al primo montaggio, effettuare un ciclo di carica completa di almeno 6 ore consecutive.</p>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
             <h2 class="text-xl font-bold text-slate-900 mb-4">Domande Frequenti (Dreame L20 Ultra)</h2>
             
         <div class="border-b border-slate-200 py-4">
@@ -115,6 +139,37 @@
         </div>
         
         </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-bold text-slate-900 mb-3">Altre Schede Tecniche Correlate (Dreame)</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                
+        <a href="/modello/dreame-l10s-ultra.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase">Robot Aspirapolvere</span>
+            <p class="font-bold text-slate-900 text-sm mt-1">Dreame L10s Ultra</p>
+            <p class="text-xs font-mono text-slate-500 mt-1">Cod: P2150-8S2P-XWDLS</p>
+        </a>
+        
+        <a href="/modello/dreame-d10-plus.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase">Robot Aspirapolvere</span>
+            <p class="font-bold text-slate-900 text-sm mt-1">Dreame D10 Plus / D10s Plus</p>
+            <p class="text-xs font-mono text-slate-500 mt-1">Cod: P2008-4S2P-MMBK</p>
+        </a>
+        
+        <a href="/modello/dreame-x40-ultra.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase">Robot Aspirapolvere</span>
+            <p class="font-bold text-slate-900 text-sm mt-1">Dreame X40 Ultra Complete</p>
+            <p class="text-xs font-mono text-slate-500 mt-1">Cod: P2149-4S2P-6400</p>
+        </a>
+        
+        <a href="/modello/dreame-v11-v12-t20.html" class="block p-4 rounded-lg border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-white transition">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase">Scopa Elettrica Senza Fili</span>
+            <p class="font-bold text-slate-900 text-sm mt-1">Dreame V11 / V12 / T20 / T30 Scopa Senza Fili</p>
+            <p class="text-xs font-mono text-slate-500 mt-1">Cod: P2032-7S1P-BWA / V11-LI</p>
+        </a>
+        
+            </div>
+        </div>
     </main>
 
     <footer class="bg-slate-900 text-slate-400 text-xs py-8 px-4 mt-12">
@@ -123,5 +178,27 @@
             <p>In qualità di Affiliato Amazon e partner eBay Partner Network, questo portale riceve una commissione sugli acquisti idonei effettuati tramite i link presenti, senza alcun sovrapprezzo per l'utente.</p>
         </div>
     </footer>
+
+    <script>
+    function evidenziaRicambio(tipo) {
+        const boxBatt = document.getElementById('box-batteria');
+        const boxKit = document.getElementById('box-kit');
+        const msg = document.getElementById('diagnosi-msg');
+        boxBatt.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+        boxKit.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+        if (tipo === 'batteria') {
+            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: sostituisci la batteria verificando il codice P2149-4S2P-XWDLS.';
+        } else if (tipo === 'kit') {
+            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: rinnova filtri, spazzole o lame per ripristinare la resa originale.';
+        } else {
+            boxBatt.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            boxKit.classList.add('ring-4', 'ring-emerald-400', 'bg-emerald-50');
+            msg.textContent = 'Consiglio tecnico: revisione completa con batteria nuova (P2149-4S2P-XWDLS) e kit consumabili.';
+        }
+        msg.classList.remove('hidden');
+    }
+    </script>
 </body>
 </html>
